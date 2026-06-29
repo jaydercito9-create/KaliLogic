@@ -166,7 +166,7 @@ export function DashboardShell({ mode, active = "dashboard", children }: Dashboa
           <div className="dashboard-search"><Search size={16} /><span>Buscar productos, clientes o acciones...</span><kbd>⌘ K</kbd></div>
           <div className="dashboard-topbar__right">
             {isControl && <span className="environment-badge"><i /> Sistema operativo</span>}
-            {!isControl && <span className="trial-badge"><span>24H</span></span>}
+            {!isControl && <span className="trial-badge"><span>TRIAL</span></span>}
             <button className="topbar-icon" aria-label="Notificaciones"><Bell size={18} /><i /></button>
           </div>
         </header>

@@ -1,23 +1,54 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-import { proxy } from "./lib/routing";
+function normalizeHost(request: NextRequest) {
+  return (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "")
+    .split(":")[0]
+    .toLowerCase();
+}
 
-export async function middleware(request: NextRequest) {
-  // 1. Domain/host based routing (app. and control.) — safe no-op on vercel.app for now
-  const proxyResult = proxy(request);
+function applyProxy(request: NextRequest) {
+  const host = normalizeHost(request);
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase() ?? "kalilogic.pe";
+  const { pathname } = request.nextUrl;
 
-  // If proxy performed a rewrite (pathname changed), return it immediately
-  if (proxyResult && proxyResult.headers.get("x-middleware-rewrite")) {
-    return proxyResult;
+  const isAppHost = host === `app.${rootDomain}` || host === "app.localhost" || host.endsWith(".app.localhost");
+  const isControlHost = host === `control.${rootDomain}` || host === "control.localhost" || host.endsWith(".control.localhost");
+
+  if (isAppHost && !pathname.startsWith("/app")) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/app${pathname === "/" ? "" : pathname}`;
+    const res = NextResponse.rewrite(url);
+    res.headers.set("x-middleware-rewrite", "1");
+    return res;
   }
 
-  // 2. Supabase Auth session handling (required for getUser, cookies, etc.)
+  if (isControlHost && !pathname.startsWith("/control")) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/control${pathname === "/" ? "" : pathname}`;
+    const res = NextResponse.rewrite(url);
+    res.headers.set("x-middleware-rewrite", "1");
+    return res;
+  }
+
+  return null;
+}
+
+export async function middleware(request: NextRequest) {
+  // Domain based routing for app. and control.
+  try {
+    const proxyResult = applyProxy(request);
+    if (proxyResult) {
+      return proxyResult;
+    }
+  } catch {}
+
+  // Supabase session
   const supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "",
     {
       cookies: {
         getAll() {
@@ -32,8 +63,9 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh auth session on every request
-  await supabase.auth.getUser();
+  try {
+    await supabase.auth.getUser();
+  } catch {}
 
   return supabaseResponse;
 }

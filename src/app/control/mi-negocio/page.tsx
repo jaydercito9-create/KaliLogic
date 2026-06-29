@@ -12,15 +12,68 @@ import {
   WalletCards,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Mi tienda — Control" };
 
-export default function MyBusinessPage() {
+import { redirect } from "next/navigation";
+
+export default async function MyBusinessPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  // Only platform admins should access their internal store this way
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_platform_admin")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.is_platform_admin) redirect("/app");
+
+  let tiendaName = "Tu Tienda Interna";
+  let orgId: string | null = null;
+  let productos: any[] = [];
+
+  const { data: membership } = await supabase
+    .from("memberships")
+    .select("organization_id, organizations(name, is_internal)")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const org = membership?.organizations as any;
+  if (org?.is_internal) {
+    tiendaName = org.name || "Tu Tienda Interna";
+    orgId = membership?.organization_id || null;
+  } else {
+    const { data: internal } = await supabase
+      .from("organizations")
+      .select("id, name")
+      .eq("is_internal", true)
+      .limit(1)
+      .maybeSingle();
+    tiendaName = internal?.name || "KaliLogic - Tienda Propia (Jayder)";
+    orgId = internal?.id || null;
+  }
+
+  if (orgId) {
+    const { data: prods } = await supabase
+      .from("products")
+      .select("id, name, sku, sale_price, category")
+      .eq("organization_id", orgId)
+      .limit(10);
+    productos = prods || [];
+  }
+
   return (
     <DashboardShell mode="control" active="my-store">
       <div className="business-context-bar">
         <Link href="/control"><ArrowLeft size={14} /> Volver a KaliLogic</Link>
-        <span><i /> Estás administrando tu empresa: <strong>Mi Tienda Principal</strong></span>
+        <span><i /> Estás administrando tu empresa: <strong>{tiendaName}</strong></span>
       </div>
 
       <div className="page-heading">
@@ -29,10 +82,10 @@ export default function MyBusinessPage() {
       </div>
 
       <section className="kpi-grid">
-        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--blue"><CircleDollarSign size={20} /></span><small>Ventas de hoy</small></div><strong>S/ 1,486.50</strong><p><span className="trend trend--up"><ArrowUpRight size={13} /> 9.8%</span> frente a ayer</p></article>
-        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--violet"><WalletCards size={20} /></span><small>Saldo en caja</small></div><strong>S/ 1,824.20</strong><p><span className="trend trend--up">Caja abierta</span> desde 8:04 a. m.</p></article>
-        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--cyan"><ShoppingCart size={20} /></span><small>Ventas realizadas</small></div><strong>16</strong><p><span className="trend trend--up"><ArrowUpRight size={13} /> 3 más</span> ticket S/ 92.90</p></article>
-        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--orange"><Boxes size={20} /></span><small>Stock bajo</small></div><strong>4 productos</strong><p>Revisa el inventario esta semana</p></article>
+        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--blue"><CircleDollarSign size={20} /></span><small>Productos</small></div><strong>{productos.length}</strong><p>Datos reales</p></article>
+        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--violet"><Boxes size={20} /></span><small>Catálogo</small></div><strong>Real</strong><p>Tu tienda</p></article>
+        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--cyan"><ShoppingCart size={20} /></span><small>Ventas</small></div><strong>—</strong><p>Próximamente</p></article>
+        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--orange"><WalletCards size={20} /></span><small>Caja</small></div><strong>—</strong><p>Próximamente</p></article>
       </section>
 
       <section className="dashboard-grid own-store-grid">
@@ -47,9 +100,14 @@ export default function MyBusinessPage() {
         </article>
 
         <article className="panel-card">
-          <div className="panel-card__heading"><div><h2>Ventas de la semana</h2><p>Ingresos diarios de tu tienda</p></div><select><option>Esta semana</option></select></div>
-          <div className="store-bars">
-            {[45, 64, 51, 78, 66, 88, 71].map((value, index) => <div key={index}><i style={{ height: `${value}%` }} /><span>{["L", "M", "M", "J", "V", "S", "D"][index]}</span></div>)}
+          <div className="panel-card__heading"><div><h2>Productos de tu tienda</h2><p>Datos reales de {tiendaName}</p></div></div>
+          <div className="stock-list">
+            {productos.length > 0 ? productos.map((p: any, i: number) => (
+              <div key={i}>
+                <span className="stock-product stock-product--blue"><Package size={18} /></span>
+                <p><strong>{p.name}</strong><small>{p.sku} · S/ {p.sale_price}</small></p>
+              </div>
+            )) : <div style={{padding:'12px', color:'#778398'}}>Aún no hay productos. Agrega desde el demo o sección de productos.</div>}
           </div>
         </article>
       </section>

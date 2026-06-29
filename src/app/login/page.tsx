@@ -33,8 +33,22 @@ export default function LoginPage() {
       return;
     }
 
-    // Por ahora redirigimos al panel del cliente
-    // Más adelante detectaremos si es platform admin y mandaremos a /control
+    // Check if platform admin -> go to /control, else /app
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("is_platform_admin")
+          .eq("id", user.id)
+          .single();
+        if (prof?.is_platform_admin) {
+          router.push("/control");
+          return;
+        }
+      }
+    } catch {}
+
     router.push("/app");
   }
 

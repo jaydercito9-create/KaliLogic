@@ -6,7 +6,21 @@ export async function createClient() {
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!url || !publishableKey) {
-    throw new Error("Faltan las variables públicas de Supabase.");
+    console.error("Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY en el servidor.");
+    // Safe dummy so Server Components never crash the render
+    const dummyResponse = { data: null, error: null };
+    const dummyList = { data: [], error: null };
+    const chain = () => ({
+      eq: chain,
+      limit: () => ({ maybeSingle: async () => dummyResponse, order: async () => dummyList }),
+      order: () => ({ limit: async () => dummyList }),
+      maybeSingle: async () => dummyResponse,
+      single: async () => dummyResponse,
+    });
+    return {
+      auth: { getUser: async () => ({ data: { user: null }, error: null }) },
+      from: () => ({ select: chain }),
+    } as any;
   }
 
   const cookieStore = await cookies();

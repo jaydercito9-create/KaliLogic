@@ -33,7 +33,7 @@ export function DemoForm() {
       setResult(res);
       setSubmitted(true);
     } else {
-      setError(res.error || "Ocurrió un error al crear tu demo. Revisa que todas las variables de entorno estén puestas en Vercel.");
+      setError(res.error || "Ocurrió un error al crear tu empresa. Revisa las variables en Vercel.");
     }
   }
 
@@ -76,7 +76,7 @@ export function DemoForm() {
       <div className="demo-form__heading">
         <span className="eyebrow">REGISTRA TU NEGOCIO</span>
         <h1>Cuéntanos sobre tu negocio</h1>
-        <p>Creamos tu empresa real en segundos. Tendrás 24 horas de prueba completa con datos reales.</p>
+        <p>Creamos tu empresa real + productos y stock según tu rubro. 24 horas de prueba.</p>
       </div>
 
       <div className="field-grid">
@@ -106,13 +106,13 @@ export function DemoForm() {
 
       <label className="terms-check">
         <input required type="checkbox" />
-        <span>Acepto los <a href="#">términos de uso</a>, la <a href="#">política de privacidad</a> y recibir información relacionada con mi demo.</span>
+        <span>Acepto los <a href="#">términos de uso</a>, la <a href="#">política de privacidad</a> y recibir información relacionada con mi negocio.</span>
       </label>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <button className="button button--primary demo-submit" disabled={loading}>
-        {loading ? <><LoaderCircle className="spin" size={17} /> Registrando...</> : <>Crear mi demo gratis <ArrowRight size={17} /></>}
+        {loading ? <><LoaderCircle className="spin" size={17} /> Creando empresa...</> : <>Crear mi empresa gratis <ArrowRight size={17} /></>}
       </button>
 
       <p className="demo-form__login">¿Ya tienes una cuenta? <Link href="/login">Inicia sesión</Link></p>
