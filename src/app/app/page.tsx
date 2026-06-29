@@ -34,25 +34,26 @@ export default async function ClientDashboardPage() {
   let lowStock: any[] = [];
 
   try {
-    // Get current user + their organization (first one)
-    const { data: { user: u } } = await supabase.auth.getUser(); // already have
-
     if (user) {
       const { data: membership } = await supabase
         .from("memberships")
-        .select("organization_id, organizations(name)")
+        .select("organization_id, organizations(name, is_internal)")
         .eq("user_id", user.id)
         .eq("is_active", true)
         .limit(1)
         .maybeSingle();
 
-      if (membership?.organizations) {
-        orgName = (membership.organizations as any).name || "Tu Negocio";
+      const org = membership?.organizations as any;
+      if (org) {
+        orgName = org.name || "Tu Negocio";
+        if (org.is_internal) {
+          orgName = org.name + " (tu tienda interna - ve a /control/mi-negocio)";
+        }
       }
 
       const orgId = membership?.organization_id || "";
 
-      // Real products count + low stock example
+      // Real products count
       const { data: products } = await supabase
         .from("products")
         .select("id, name, sku")
@@ -61,13 +62,27 @@ export default async function ClientDashboardPage() {
 
       productsCount = products?.length || 0;
 
-      // Simple low stock simulation (in real app we'd join inventory)
-      lowStock = (products || []).slice(0, 3).map((p: any, i: number) => ({
-        name: p.name,
-        sku: p.sku,
-        units: 3 + i,
-        tone: ["blue", "violet", "orange"][i % 3],
-      }));
+      // Real low-stock from inventory_balances
+      if (orgId && productsCount > 0) {
+        const { data: balances } = await supabase
+          .from("inventory_balances")
+          .select("quantity, minimum_quantity, product_id, products(name, sku)")
+          .eq("organization_id", orgId)
+          .order("quantity", { ascending: true })
+          .limit(6);
+
+        const tones = ["blue", "violet", "orange"];
+        const mapped = (balances || [])
+          .filter((b: any) => b.products)
+          .slice(0, 3)
+          .map((b: any, i: number) => ({
+            name: (b.products as any).name,
+            sku: (b.products as any).sku,
+            units: b.quantity,
+            tone: tones[i % 3],
+          }));
+        lowStock = mapped;
+      }
     }
   } catch (e) {
     console.error("Error loading /app data (likely missing Supabase env vars or connection):", e);

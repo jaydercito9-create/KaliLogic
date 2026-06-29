@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   BarChart3,
   Bell,
@@ -12,6 +12,7 @@ import {
   CreditCard,
   Headphones,
   LayoutDashboard,
+  LogOut,
   Menu,
   Package,
   ReceiptText,
@@ -27,8 +28,17 @@ import {
   X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { createClient } from "@/lib/supabase/client";
 
 type ShellMode = "client" | "control";
+
+type NavItem = {
+  key: string;
+  label: string;
+  icon: React.FC<{ size?: number }>;
+  href: string;
+  badge?: string;
+};
 
 type DashboardShellProps = {
   mode: ShellMode;
@@ -36,7 +46,7 @@ type DashboardShellProps = {
   children: React.ReactNode;
 };
 
-const clientSections = [
+const clientSections: { label: string; items: NavItem[] }[] = [
   {
     label: "GENERAL",
     items: [
@@ -48,7 +58,7 @@ const clientSections = [
     label: "GESTIÓN",
     items: [
       { key: "products", label: "Productos", icon: Package, href: "/app?modulo=productos" },
-      { key: "inventory", label: "Inventario", icon: Boxes, href: "/app?modulo=inventario", badge: "6" },
+      { key: "inventory", label: "Inventario", icon: Boxes, href: "/app?modulo=inventario" },
       { key: "categories", label: "Categorías y marcas", icon: Tags, href: "/app?modulo=categorias" },
       { key: "customers", label: "Clientes", icon: Users, href: "/app?modulo=clientes" },
       { key: "suppliers", label: "Proveedores", icon: Building2, href: "/app?modulo=proveedores" },
@@ -64,13 +74,13 @@ const clientSections = [
   },
 ];
 
-const controlSections = [
+const controlSections: { label: string; items: NavItem[] }[] = [
   {
     label: "KALILOGIC",
     items: [
       { key: "platform", label: "Vista general", icon: LayoutDashboard, href: "/control" },
       { key: "companies", label: "Empresas", icon: Building2, href: "/control?modulo=empresas" },
-      { key: "demos", label: "Demos y leads", icon: Sparkles, href: "/control?modulo=demos", badge: "12" },
+      { key: "demos", label: "Demos y leads", icon: Sparkles, href: "/control?modulo=demos" },
       { key: "subscriptions", label: "Suscripciones", icon: CreditCard, href: "/control?modulo=suscripciones" },
       { key: "payments", label: "Pagos", icon: CircleDollarSign, href: "/control?modulo=pagos" },
       { key: "plans", label: "Planes y cupones", icon: TicketPercent, href: "/control?modulo=planes" },
@@ -79,7 +89,7 @@ const controlSections = [
   {
     label: "OPERACIÓN",
     items: [
-      { key: "support", label: "Soporte", icon: Headphones, href: "/control?modulo=soporte", badge: "3" },
+      { key: "support", label: "Soporte", icon: Headphones, href: "/control?modulo=soporte" },
       { key: "finance", label: "Finanzas KaliLogic", icon: ReceiptText, href: "/control?modulo=finanzas" },
       { key: "audit", label: "Registro de actividad", icon: BarChart3, href: "/control?modulo=auditoria" },
       { key: "settings", label: "Configuración", icon: Settings, href: "/control?modulo=configuracion" },
@@ -91,6 +101,28 @@ export function DashboardShell({ mode, active = "dashboard", children }: Dashboa
   const [open, setOpen] = useState(false);
   const isControl = mode === "control";
   const sections = isControl ? controlSections : clientSections;
+
+  const [userName, setUserName] = useState(isControl ? "Admin" : "Usuario");
+  const [orgName, setOrgName] = useState(isControl ? "Plataforma KaliLogic" : "Mi Negocio");
+  const [avatar, setAvatar] = useState(isControl ? "KA" : "U");
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const full = user.user_metadata?.full_name || user.email?.split("@")[0] || (isControl ? "Admin" : "Usuario");
+          setUserName(full.split(" ")[0] || full);
+          setAvatar(isControl ? "KA" : (full[0] || "U").toUpperCase());
+          if (!isControl) {
+            setOrgName(user.user_metadata?.company || "Mi Negocio");
+          }
+        }
+      } catch {}
+    };
+    load();
+  }, [isControl]);
 
   return (
     <div className={`dashboard-shell ${open ? "dashboard-shell--open" : ""}`}>
@@ -111,7 +143,7 @@ export function DashboardShell({ mode, active = "dashboard", children }: Dashboa
         {!isControl && (
           <div className="workspace-switcher">
             <span className="workspace-switcher__icon workspace-switcher__icon--store"><Store size={15} /></span>
-            <div><small>Mi empresa</small><strong>Moda Aurora</strong></div>
+            <div><small>Mi empresa</small><strong>{orgName}</strong></div>
             <ChevronDown size={14} />
           </div>
         )}
@@ -145,16 +177,28 @@ export function DashboardShell({ mode, active = "dashboard", children }: Dashboa
 
         {!isControl && (
           <div className="plan-usage-card">
-            <div><span>Plan Premium</span><b>72%</b></div>
+            <div><span>Trial 24h</span><b>Activo</b></div>
             <i><em /></i>
-            <small>3,612 de 5,000 productos</small>
+            <small>Productos reales cargados</small>
           </div>
         )}
 
         <div className="sidebar-profile">
-          <span className="sidebar-profile__avatar">{isControl ? "KA" : "LM"}</span>
-          <div><strong>{isControl ? "Kalil Admin" : "Lucía Mendoza"}</strong><small>{isControl ? "Superadministrador" : "Propietaria"}</small></div>
-          <ChevronDown size={14} />
+          <span className="sidebar-profile__avatar">{avatar}</span>
+          <div><strong>{userName}</strong><small>{isControl ? "Superadministrador" : "Propietario"}</small></div>
+          <button
+            className="sidebar-logout"
+            aria-label="Cerrar sesión"
+            onClick={async () => {
+              try {
+                const supabase = createClient();
+                await supabase.auth.signOut();
+              } catch {}
+              window.location.href = "/login";
+            }}
+          >
+            <LogOut size={15} />
+          </button>
         </div>
       </aside>
 
@@ -166,7 +210,6 @@ export function DashboardShell({ mode, active = "dashboard", children }: Dashboa
           <div className="dashboard-search"><Search size={16} /><span>Buscar productos, clientes o acciones...</span><kbd>⌘ K</kbd></div>
           <div className="dashboard-topbar__right">
             {isControl && <span className="environment-badge"><i /> Sistema operativo</span>}
-            {!isControl && <span className="trial-badge"><span>TRIAL</span></span>}
             <button className="topbar-icon" aria-label="Notificaciones"><Bell size={18} /><i /></button>
           </div>
         </header>

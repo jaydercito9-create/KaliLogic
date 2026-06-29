@@ -1499,6 +1499,23 @@ a {
 .sidebar-profile small { color: #71809a; font-size: 7px; }
 .sidebar-profile > svg { color: #64728c; }
 
+.sidebar-logout {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64728c;
+  transition: background .15s, color .15s;
+}
+.sidebar-logout:hover {
+  background: rgba(239,68,68,.12);
+  color: #ef4444;
+}
+
 .dashboard-main {
   min-height: 100vh;
   margin-left: 252px;

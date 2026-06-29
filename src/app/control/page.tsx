@@ -81,7 +81,7 @@ export default async function ControlPage() {
       <Link className="own-business-banner" href="/control/mi-negocio">
         <span className="own-business-banner__icon"><Store size={23} /></span>
         <div><small>TU EMPRESA, EN EL MISMO PANEL</small><strong>Administrar mi tienda</strong><p>Ventas, productos, inventario y caja sin cerrar tu sesión de superadministrador.</p></div>
-        <span className="own-business-banner__stats"><small>Ventas hoy</small><strong>S/ 1,486.50</strong></span>
+        <span className="own-business-banner__stats"><small>Ventas</small><strong>—</strong></span>
         <span className="own-business-banner__action">Abrir mi negocio <ArrowRight size={16} /></span>
       </Link>
 

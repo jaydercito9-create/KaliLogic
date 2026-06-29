@@ -228,7 +228,7 @@ async function seedRealDemoData(
         product_id: prod.id,
         movement_type: "initial",
         quantity: qty,
-        notes: "Stock inicial de demostración",
+        notes: "Stock inicial",
       });
     }
   }

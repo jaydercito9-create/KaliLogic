@@ -106,7 +106,7 @@ export function DemoForm() {
 
       <label className="terms-check">
         <input required type="checkbox" />
-        <span>Acepto los <a href="#">términos de uso</a>, la <a href="#">política de privacidad</a> y recibir información relacionada con mi negocio.</span>
+        <span>Acepto los <a href="#">términos de uso</a>, la <a href="#">política de privacidad</a> y recibir información relacionada con mi registro.</span>
       </label>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}

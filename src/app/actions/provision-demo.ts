@@ -160,7 +160,7 @@ async function seedDemoData(
         product_id: product.id,
         movement_type: "initial",
         quantity: Math.floor(Math.random() * 40) + 12,
-        notes: "Stock inicial de demostración",
+        notes: "Stock inicial",
       });
     }
   }
