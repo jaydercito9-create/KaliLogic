@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-import { proxy } from "./src/proxy";
+import { proxy } from "./lib/routing";
 
 export async function middleware(request: NextRequest) {
   // 1. Domain/host based routing (app. and control.) — safe no-op on vercel.app for now
