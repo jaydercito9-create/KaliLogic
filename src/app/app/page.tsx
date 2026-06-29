@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { VentasModule } from "@/components/ventas-module";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -289,7 +290,7 @@ export default async function ClientDashboardPage({
     : "dashboard";
 
   return (
-    <DashboardShell mode="client" active={activeKey}>
+    <DashboardShell mode="client" active={activeKey} orgId={orgId}>
       {modulo === "dashboard" && (
         <DashboardHome user={user} orgName={orgName} orgId={orgId} supabase={supabase} />
       )}
@@ -299,8 +300,8 @@ export default async function ClientDashboardPage({
       {modulo === "inventario" && orgId && (
         <InventarioModule orgId={orgId} supabase={supabase} />
       )}
-      {modulo === "ventas" && (
-        <ComingSoon modulo="Punto de venta" icon={ShoppingCart} desc="Aquí podrás registrar ventas, emitir boletas y ver el historial de operaciones. Estamos construyendo este módulo." />
+      {modulo === "ventas" && orgId && (
+        <VentasModule orgId={orgId} />
       )}
       {modulo === "clientes" && (
         <ComingSoon modulo="Clientes" icon={UserPlus} desc="Gestiona tu base de clientes, historial de compras y datos de contacto." />

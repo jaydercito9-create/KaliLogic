@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft,
   CheckCircle2,
   Loader2,
   Minus,
@@ -11,18 +10,17 @@ import {
   Plus,
   Search,
   ShoppingCart,
-  Trash2,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { processSale, CartItem } from "@/app/actions/create-sale";
+import { processSale } from "@/app/actions/create-sale";
+import type { CartItem } from "@/app/actions/sale-core";
 
 type Product = {
   id: string;
   name: string;
   sku: string;
   sale_price: number;
-  category: string | null;
 };
 
 export function VentasModule({ orgId }: { orgId: string }) {
@@ -41,13 +39,13 @@ export function VentasModule({ orgId }: { orgId: string }) {
     const supabase = createClient();
     supabase
       .from("products")
-      .select("id, name, sku, sale_price, category")
+      .select("id, name, sku, sale_price")
       .eq("organization_id", orgId)
       .eq("is_active", true)
       .order("name")
       .limit(100)
-      .then(({ data }: { data: any }) => {
-        setProducts(data || []);
+      .then(({ data }: { data: Product[] | null }) => {
+        setProducts(data ?? []);
         setLoading(false);
       });
   }, [orgId]);
@@ -66,7 +64,7 @@ export function VentasModule({ orgId }: { orgId: string }) {
           i.product_id === p.id ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
-      return [...prev, { product_id: p.id, name: p.name, sku: p.sku, unit_price: p.sale_price, quantity: 1 }];
+      return [...prev, { product_id: p.id, name: p.name, unit_price: p.sale_price, quantity: 1 }];
     });
   };
 
@@ -90,7 +88,7 @@ export function VentasModule({ orgId }: { orgId: string }) {
     const res = await processSale({ org_id: orgId, items: cart, customer_name: customerName, payment_method: paymentMethod, discount });
     setProcessing(false);
     if (res.success) {
-      setSuccess({ saleNumber: res.saleNumber as number, total: res.total as number });
+      setSuccess({ saleNumber: res.saleNumber, total: res.total });
       setCart([]);
       setCustomerName("");
       setDiscount(0);

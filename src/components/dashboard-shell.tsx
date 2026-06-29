@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { createClient } from "@/lib/supabase/client";
+import { NotificacionesBell } from "@/components/notificaciones-bell";
 
 type ShellMode = "client" | "control";
 
@@ -43,6 +44,7 @@ type NavItem = {
 type DashboardShellProps = {
   mode: ShellMode;
   active?: string;
+  orgId?: string;
   children: React.ReactNode;
 };
 
@@ -97,7 +99,7 @@ const controlSections: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-export function DashboardShell({ mode, active = "dashboard", children }: DashboardShellProps) {
+export function DashboardShell({ mode, active = "dashboard", orgId, children }: DashboardShellProps) {
   const [open, setOpen] = useState(false);
   const isControl = mode === "control";
   const sections = isControl ? controlSections : clientSections;
@@ -210,7 +212,11 @@ export function DashboardShell({ mode, active = "dashboard", children }: Dashboa
           <div className="dashboard-search"><Search size={16} /><span>Buscar productos, clientes o acciones...</span><kbd>⌘ K</kbd></div>
           <div className="dashboard-topbar__right">
             {isControl && <span className="environment-badge"><i /> Sistema operativo</span>}
-            <button className="topbar-icon" aria-label="Notificaciones"><Bell size={18} /><i /></button>
+            {orgId ? (
+              <NotificacionesBell orgId={orgId} />
+            ) : (
+              <button className="topbar-icon" aria-label="Notificaciones"><Bell size={18} /></button>
+            )}
           </div>
         </header>
         <div className="dashboard-content">{children}</div>
