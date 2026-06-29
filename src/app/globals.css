@@ -1783,6 +1783,68 @@ a {
 .dashboard-grid--main { grid-template-columns: 1.65fr .75fr; }
 .dashboard-grid--bottom { grid-template-columns: 1.5fr .9fr; }
 
+/* ── Coming Soon Panel ── */
+.coming-soon-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 400px;
+  text-align: center;
+  padding: 40px 20px;
+}
+.coming-soon-panel__icon {
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #eef3ff, #e8e2ff);
+  color: #4f6ef7;
+}
+.coming-soon-panel h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f1d35;
+}
+.coming-soon-panel p {
+  font-size: 14px;
+  color: #778398;
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+/* ── Data Table ── */
+.data-table-wrap {
+  overflow-x: auto;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table thead th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: #8898aa;
+  border-bottom: 1px solid #eef0f5;
+  background: #f8f9fc;
+}
+.data-table tbody tr {
+  border-bottom: 1px solid #f1f4f9;
+  transition: background .1s;
+}
+.data-table tbody tr:hover { background: #f8faff; }
+.data-table tbody td {
+  padding: 11px 16px;
+  color: #2d3a52;
+}
+.data-table tbody tr:last-child { border-bottom: none; }
+
 .panel-card {
   overflow: hidden;
   border: 1px solid #e3e8f0;
