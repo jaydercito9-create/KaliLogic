@@ -3,14 +3,13 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, CheckCircle2, ImagePlus, LoaderCircle, Mail, Store } from "lucide-react";
-import { createDemoLead } from "@/app/actions/create-demo";
-import { createClient } from "@/lib/supabase/client";
-import { provisionDemoOrganization } from "@/app/actions/provision-demo";
+import { createDemo } from "@/app/actions/create-demo";
 
 export function DemoForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [company, setCompany] = useState("");
+  const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -19,93 +18,54 @@ export function DemoForm() {
     setError(null);
 
     const formData = new FormData(event.currentTarget);
-    const name = (formData.get("name") as string) || "";
-    const companyName = (formData.get("company") as string) || "";
-    const email = (formData.get("email") as string) || "";
-    const phone = (formData.get("phone") as string) || "";
-    const businessType = (formData.get("businessType") as string) || "";
 
-    const supabase = createClient();
-
-    // 1. Guardamos el lead (usando server action con service role)
-    const leadResult = await createDemoLead({
-      full_name: name,
-      company_name: companyName,
-      email,
-      phone,
-      business_type: businessType,
+    const res = await createDemo({
+      full_name: (formData.get("name") as string) || "",
+      company_name: (formData.get("company") as string) || "",
+      email: (formData.get("email") as string) || "",
+      phone: (formData.get("phone") as string) || "",
+      business_type: (formData.get("businessType") as string) || "",
     });
-
-    if (!leadResult.success) {
-      setLoading(false);
-      setError(leadResult.error || "Error guardando la solicitud");
-      return;
-    }
-
-    // 2. Creamos la cuenta (puede requerir confirmación de email)
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password: "Demo2026!",
-      options: {
-        data: {
-          full_name: name,
-          phone,
-        },
-      },
-    });
-
-    if (signUpError && !signUpError.message.includes("already registered")) {
-      console.warn("Sign up note:", signUpError.message);
-    }
-
-    // 3. Intentar iniciar sesión con contraseña temporal + crear la organización real
-    try {
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email,
-        password: "Demo2026!",
-      });
-
-      if (!signInErr) {
-        // Usuario autenticado → creamos su empresa de demo real
-        await provisionDemoOrganization({
-          companyName: companyName,
-          businessType,
-        });
-      }
-    } catch (e) {
-      console.log("Provision skipped (probablemente necesita confirmar email):", e);
-    }
 
     setLoading(false);
-    setSubmitted(true);
+
+    if (res.success) {
+      setResult(res);
+      setSubmitted(true);
+    } else {
+      setError(res.error || "Ocurrió un error al crear tu demo. Revisa que todas las variables de entorno estén puestas en Vercel.");
+    }
   }
 
-  if (submitted) {
+  if (submitted && result) {
     return (
       <div className="demo-success">
         <span className="demo-success__icon"><CheckCircle2 size={30} /></span>
-        <span className="eyebrow">DEMO REGISTRADA</span>
-        <h1>¡Solicitud recibida!</h1>
+        <span className="eyebrow">EMPRESA CREADA</span>
+        <h1>¡Listo! Tu negocio ya existe en KaliLogic</h1>
         <p>
-          Creamos tu cuenta y <strong>tu empresa real</strong> en KaliLogic para <strong>{company || "tu negocio"}</strong>.
-          Tienes productos de ejemplo según tu rubro y 24 horas de prueba.
+          Se creó <strong>{result.companyName}</strong> con productos reales según tu rubro + prueba de 24 horas.
         </p>
+
         <div className="demo-success__details">
-          <div><Mail size={17} /><span><strong>Contraseña temporal</strong><small>Demo2026! — cámbiala después</small></span><Check size={15} /></div>
-          <div><Store size={17} /><span><strong>Empresa creada</strong><small>Ve a /app después de iniciar sesión</small></span><Check size={15} /></div>
+          <div><Mail size={17} /><span><strong>Tu correo</strong><small>{result.email || "el que registraste"}</small></span><Check size={15} /></div>
+          <div><strong>Contraseña temporal:</strong> <span className="font-mono bg-gray-100 px-2 rounded">{result.tempPassword}</span></div>
         </div>
 
         <div className="mt-4 flex flex-col gap-3">
           <Link className="button button--primary" href="/login">
-            Iniciar sesión ahora <ArrowRight size={17} />
+            Iniciar sesión con tu contraseña temporal <ArrowRight size={17} />
           </Link>
           <Link className="button button--secondary" href="/app">
-            Ir al panel del cliente
+            Ir al panel del cliente (/app)
+          </Link>
+          <Link className="button button--ghost" href="/control">
+            Ir al panel de superadmin (/control)
           </Link>
         </div>
 
         <small className="demo-success__note">
-          Si el login falla, confirma tu correo en Supabase o desactiva confirmaciones temporalmente en Authentication settings.
+          Cambia la contraseña después de entrar. Si el login pide confirmación de email, desactiva temporalmente "Confirm email" en Supabase Authentication settings.
         </small>
       </div>
     );

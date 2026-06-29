@@ -16,17 +16,35 @@ import {
   UserRoundPlus,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Control de plataforma" };
 
-const companies = [
-  { name: "Moda Aurora", owner: "Lucía Mendoza", plan: "Premium", status: "Activa", renewal: "12 jul 2026", usage: "72%" },
-  { name: "Casa Nova", owner: "Renzo Salazar", plan: "Básico", status: "Activa", renewal: "18 jul 2026", usage: "41%" },
-  { name: "Urban Step", owner: "Carla Díaz", plan: "Plus", status: "Activa", renewal: "22 jul 2026", usage: "58%" },
-  { name: "Bazar Valentina", owner: "Sofía Rojas", plan: "Premium", status: "Pendiente", renewal: "Hoy", usage: "33%" },
-];
+export default async function ControlPage() {
+  const supabase = await createClient();
 
-export default function ControlPage() {
+  // Carga datos reales
+  const { data: leads } = await supabase
+    .from("leads")
+    .select("id, full_name, company_name, email, business_type, created_at")
+    .order("created_at", { ascending: false })
+    .limit(8);
+
+  const { data: orgs } = await supabase
+    .from("organizations")
+    .select("id, name, business_type, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(6);
+
+  const realCompanies = (orgs || []).map((o: any, i: number) => ({
+    name: o.name,
+    owner: "—",
+    plan: "Básico",
+    status: o.status === "trial" ? "Demo" : "Activa",
+    renewal: "—",
+    usage: "—",
+  }));
+
   return (
     <DashboardShell mode="control" active="platform">
       <div className="page-heading admin-heading">
@@ -95,30 +113,36 @@ export default function ControlPage() {
 
       <section className="dashboard-grid admin-bottom-grid">
         <article className="panel-card companies-card">
-          <div className="panel-card__heading"><div><h2>Empresas recientes</h2><p>Actividad y consumo de sus cuentas</p></div><button className="panel-link panel-link--plain">Ver todas <ArrowRight size={14} /></button></div>
+          <div className="panel-card__heading"><div><h2>Empresas / Orgs recientes</h2><p>Datos reales de Supabase</p></div><button className="panel-link panel-link--plain">Ver todas <ArrowRight size={14} /></button></div>
           <div className="data-table-wrap">
             <table className="data-table admin-table">
-              <thead><tr><th>EMPRESA</th><th>PLAN</th><th>ESTADO</th><th>RENOVACIÓN</th><th>USO</th><th /></tr></thead>
-              <tbody>{companies.map((company) => (
-                <tr key={company.name}>
-                  <td><strong>{company.name}</strong><small>{company.owner}</small></td>
-                  <td><span className="plan-chip">{company.plan}</span></td>
-                  <td><span className={company.status === "Activa" ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>{company.status}</span></td>
-                  <td>{company.renewal}</td>
-                  <td><div className="usage-cell"><i><em style={{ width: company.usage }} /></i><span>{company.usage}</span></div></td>
-                  <td><button className="table-action"><MoreHorizontal size={16} /></button></td>
-                </tr>
-              ))}</tbody>
+              <thead><tr><th>EMPRESA</th><th>TIPO</th><th>ESTADO</th><th>FECHA</th><th /></tr></thead>
+              <tbody>
+                {(realCompanies.length ? realCompanies : [{name:"Aún no hay empresas", plan:"—", status:"—", renewal:"—", usage:"—"}]).map((company: any, idx: number) => (
+                  <tr key={idx}>
+                    <td><strong>{company.name}</strong></td>
+                    <td><span className="plan-chip">{company.plan}</span></td>
+                    <td><span className={company.status === "Activa" || company.status === "Demo" ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>{company.status}</span></td>
+                    <td>{company.renewal || "—"}</td>
+                    <td><button className="table-action"><MoreHorizontal size={16} /></button></td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         </article>
 
         <article className="panel-card activity-card">
-          <div className="panel-card__heading"><div><h2>Atención inmediata</h2><p>Acciones pendientes</p></div><Headphones size={17} /></div>
+          <div className="panel-card__heading"><div><h2>Leads / Interesados recientes</h2><p>Datos reales de Supabase</p></div><Headphones size={17} /></div>
           <div className="admin-tasks">
-            <Link href="/control?modulo=demos"><span className="task-icon task-icon--violet"><UserRoundPlus size={17} /></span><p><strong>5 clientes interesados</strong><small>Respondieron “Sí, deseo continuar”</small></p><b>5</b></Link>
-            <Link href="/control?modulo=soporte"><span className="task-icon task-icon--blue"><Headphones size={17} /></span><p><strong>3 solicitudes de soporte</strong><small>Una marcada como urgente</small></p><b>3</b></Link>
-            <Link href="/control?modulo=pagos"><span className="task-icon task-icon--orange"><CreditCard size={17} /></span><p><strong>2 pagos pendientes</strong><small>Requieren seguimiento</small></p><b>2</b></Link>
+            {(leads && leads.length > 0) ? leads.slice(0, 4).map((lead: any) => (
+              <div key={lead.id} className="text-sm">
+                <strong>{lead.company_name}</strong> — {lead.full_name}<br />
+                <small>{lead.email} • {lead.business_type}</small>
+              </div>
+            )) : (
+              <div className="text-sm text-muted">Aún no hay leads. ¡Comparte el formulario de /demo!</div>
+            )}
           </div>
         </article>
       </section>

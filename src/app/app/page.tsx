@@ -88,9 +88,9 @@ export default async function ClientDashboardPage() {
         <div className="onboarding-callout__icon"><ShoppingBag size={22} /></div>
         <div>
           <strong>Tu empresa ya tiene datos reales</strong>
-          <p>{productsCount > 0 ? `${productsCount} productos cargados. Este es tu espacio real.` : "Completa tu demo para que se creen productos de ejemplo."}</p>
+          <p>{productsCount > 0 ? `${productsCount} productos cargados. Registra ventas y movimientos reales.` : "Crea tu primera empresa desde /demo para ver productos aquí."}</p>
         </div>
-        <button>Continuar configuración <ArrowRight size={15} /></button>
+        <Link href="/app?modulo=productos">Ir a productos</Link>
       </section>
 
       <section className="kpi-grid">
