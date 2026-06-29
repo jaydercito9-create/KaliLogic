@@ -19,10 +19,15 @@ export type DemoFormData = {
  * - Productos de ejemplo según rubro + stock inicial
  */
 export async function createDemo(data: DemoFormData) {
-  const service = createServiceClient();
+  let service;
+  try {
+    service = createServiceClient();
+  } catch (e) {
+    return { success: false, error: "Faltan las variables de Supabase en el servidor (URL o SERVICE_ROLE_KEY). Configúralas en Vercel." };
+  }
 
   try {
-    // 1. Guardar lead
+    // 1. Guardar lead (siempre)
     const { error: leadErr } = await service.from("leads").insert({
       full_name: data.full_name,
       company_name: data.company_name,
@@ -36,13 +41,12 @@ export async function createDemo(data: DemoFormData) {
     }
 
     // 2. Crear el usuario con admin (service role)
-    // Usamos contraseña temporal. El usuario debe cambiarla.
     const tempPassword = "Demo2026!";
 
     const { data: createdUser, error: userErr } = await service.auth.admin.createUser({
       email: data.email,
       password: tempPassword,
-      email_confirm: true, // Para que pueda entrar sin confirmar inmediatamente (útil en etapa inicial)
+      email_confirm: true,
       user_metadata: {
         full_name: data.full_name,
         phone: data.phone,
@@ -50,28 +54,49 @@ export async function createDemo(data: DemoFormData) {
     });
 
     if (userErr) {
-      // Si ya existe, intentamos obtenerlo
       console.warn("createUser warning:", userErr.message);
     }
 
     let userId: string | null = createdUser?.user?.id ?? null;
 
     if (!userId) {
-      // Buscar por email si ya existía
-      const { data: users } = await service.auth.admin.listUsers();
-      const found = users?.users?.find((u: any) => u.email === data.email);
+      // Buscar por email
+      const { data: listData } = await service.auth.admin.listUsers();
+      const found = listData?.users?.find((u: any) => u.email?.toLowerCase() === data.email.toLowerCase());
       userId = found?.id ?? null;
     }
 
     if (!userId) {
-      return { success: false, error: "No se pudo crear ni encontrar el usuario." };
+      return { success: false, error: "No se pudo crear ni localizar el usuario en Supabase Auth." };
     }
 
-    // 3. Crear organización
-    const slug = data.company_name
+    // 3. Si el usuario ya tiene una membresía activa, no crear otra org (evita duplicados)
+    const { data: existing } = await service
+      .from("memberships")
+      .select("organization_id, organizations(name)")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.organization_id) {
+      return {
+        success: true,
+        tempPassword,
+        organizationId: existing.organization_id,
+        companyName: (existing as any).organizations?.name || data.company_name,
+        email: data.email,
+        alreadyExists: true,
+      };
+    }
+
+    // 3. Crear organización (slug único para evitar conflictos)
+    const baseSlug = data.company_name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || `negocio-${Date.now()}`;
+      .replace(/(^-|-$)/g, "") || "negocio";
+
+    const slug = `${baseSlug}-${Date.now().toString(36).slice(-6)}`;
 
     const { data: org, error: orgErr } = await service
       .from("organizations")

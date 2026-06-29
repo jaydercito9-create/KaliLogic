@@ -46,17 +46,19 @@ export default async function ClientDashboardPage() {
       .eq("user_id", user.id)
       .eq("is_active", true)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (membership?.organizations) {
       orgName = (membership.organizations as any).name || "Tu Negocio";
     }
 
+    const orgId = membership?.organization_id || "";
+
     // Real products count + low stock example
     const { data: products } = await supabase
       .from("products")
       .select("id, name, sku")
-      .eq("organization_id", membership?.organization_id || "")
+      .eq("organization_id", orgId)
       .limit(50);
 
     productsCount = products?.length || 0;

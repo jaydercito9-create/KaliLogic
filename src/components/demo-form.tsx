@@ -44,7 +44,7 @@ export function DemoForm() {
         <span className="eyebrow">EMPRESA CREADA</span>
         <h1>¡Listo! Tu negocio ya existe en KaliLogic</h1>
         <p>
-          Se creó <strong>{result.companyName}</strong> con productos reales según tu rubro + prueba de 24 horas.
+          Se creó <strong>{result.companyName}</strong> con productos reales, stock y movimientos según tu rubro. Tienes 24 horas de prueba completa.
         </p>
 
         <div className="demo-success__details">
@@ -74,9 +74,9 @@ export function DemoForm() {
   return (
     <form className="demo-form" onSubmit={handleSubmit}>
       <div className="demo-form__heading">
-        <span className="eyebrow">PRUEBA DE 24 HORAS</span>
+        <span className="eyebrow">REGISTRA TU NEGOCIO</span>
         <h1>Cuéntanos sobre tu negocio</h1>
-        <p>Registraremos tu interés y en breve activaremos tu demo real.</p>
+        <p>Creamos tu empresa real en segundos. Tendrás 24 horas de prueba completa con datos reales.</p>
       </div>
 
       <div className="field-grid">
