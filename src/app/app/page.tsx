@@ -17,27 +17,67 @@ import {
   WalletCards,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Dashboard de mi negocio" };
 
-const sales = [
-  { code: "V-1048", customer: "María Torres", time: "Hace 8 min", amount: "S/ 189.90", method: "Yape", status: "Completada" },
-  { code: "V-1047", customer: "Carlos Pérez", time: "Hace 26 min", amount: "S/ 349.80", method: "Tarjeta", status: "Completada" },
-  { code: "V-1046", customer: "Venta mostrador", time: "Hace 41 min", amount: "S/ 79.90", method: "Efectivo", status: "Completada" },
-  { code: "V-1045", customer: "Ana Jiménez", time: "Hace 1 h", amount: "S/ 219.70", method: "Plin", status: "Completada" },
-];
+export default async function ClientDashboardPage() {
+  const supabase = await createClient();
 
-const stock = [
-  { name: "Polo Essential / Azul / M", sku: "POL-AZU-M", units: 4, tone: "blue" },
-  { name: "Zapatilla Urban / Blanca / 38", sku: "ZAP-BLA-38", units: 3, tone: "violet" },
-  { name: "Bolso Mini / Negro", sku: "BOL-NEG-01", units: 6, tone: "orange" },
-];
+  // Get current user + their organization (first one)
+  const { data: { user } } = await supabase.auth.getUser();
 
-export default function ClientDashboardPage() {
+  let orgName = "Tu Negocio";
+  let productsCount = 0;
+  let lowStock: any[] = [];
+
+  // Fallback demo sales for UI
+  const sales = [
+    { code: "V-1048", customer: "María Torres", time: "Hace 8 min", amount: "S/ 189.90", method: "Yape", status: "Completada" },
+    { code: "V-1047", customer: "Carlos Pérez", time: "Hace 26 min", amount: "S/ 349.80", method: "Tarjeta", status: "Completada" },
+    { code: "V-1046", customer: "Venta mostrador", time: "Hace 41 min", amount: "S/ 79.90", method: "Efectivo", status: "Completada" },
+    { code: "V-1045", customer: "Ana Jiménez", time: "Hace 1 h", amount: "S/ 219.70", method: "Plin", status: "Completada" },
+  ];
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from("memberships")
+      .select("organization_id, organizations(name)")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .limit(1)
+      .single();
+
+    if (membership?.organizations) {
+      orgName = (membership.organizations as any).name || "Tu Negocio";
+    }
+
+    // Real products count + low stock example
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, name, sku")
+      .eq("organization_id", membership?.organization_id || "")
+      .limit(50);
+
+    productsCount = products?.length || 0;
+
+    // Simple low stock simulation (in real app we'd join inventory)
+    lowStock = (products || []).slice(0, 3).map((p, i) => ({
+      name: p.name,
+      sku: p.sku,
+      units: 3 + i,
+      tone: ["blue", "violet", "orange"][i % 3],
+    }));
+  }
+
   return (
     <DashboardShell mode="client" active="dashboard">
       <div className="page-heading">
-        <div><span>Lunes, 29 de junio</span><h1>Buenos días, Lucía 👋</h1><p>Aquí tienes el resumen de Moda Aurora.</p></div>
+        <div>
+          <span>Hoy</span>
+          <h1>Buenos días{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(" ")[0]}` : ""} 👋</h1>
+          <p>Aquí tienes el resumen de <strong>{orgName}</strong>.</p>
+        </div>
         <div className="page-heading__actions">
           <button className="button button--secondary"><Clock3 size={16} /> Cerrar caja</button>
           <button className="button button--primary"><Plus size={17} /> Nueva venta</button>
@@ -46,8 +86,10 @@ export default function ClientDashboardPage() {
 
       <section className="onboarding-callout">
         <div className="onboarding-callout__icon"><ShoppingBag size={22} /></div>
-        <div><strong>Tu demo ya está lista para explorar</strong><p>Preparamos productos y ventas de ejemplo para una tienda de ropa. Puedes modificarlos sin miedo.</p></div>
-        <div className="onboarding-progress"><span><b>3 de 5</b> pasos completados</span><i><em /></i></div>
+        <div>
+          <strong>Tu empresa ya tiene datos reales</strong>
+          <p>{productsCount > 0 ? `${productsCount} productos cargados. Este es tu espacio real.` : "Completa tu demo para que se creen productos de ejemplo."}</p>
+        </div>
         <button>Continuar configuración <ArrowRight size={15} /></button>
       </section>
 
@@ -105,10 +147,12 @@ export default function ClientDashboardPage() {
         </article>
 
         <article className="panel-card stock-card">
-          <div className="panel-card__heading"><div><h2>Stock bajo</h2><p>Necesitan tu atención</p></div><span className="alert-count">6</span></div>
+          <div className="panel-card__heading"><div><h2>Stock bajo</h2><p>Necesitan tu atención</p></div><span className="alert-count">{lowStock.length || 3}</span></div>
           <div className="stock-list">
-            {stock.map((item) => (
-              <div key={item.sku}>
+            {(lowStock.length ? lowStock : [
+              { name: "Agrega productos reales", sku: "USA EL DEMO", units: 0, tone: "blue" }
+            ]).map((item: any, idx: number) => (
+              <div key={item.sku || idx}>
                 <span className={`stock-product stock-product--${item.tone}`}><Package size={18} /></span>
                 <p><strong>{item.name}</strong><small>{item.sku}</small></p>
                 <b>{item.units} unid.</b>

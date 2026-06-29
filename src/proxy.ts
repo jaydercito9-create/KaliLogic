@@ -31,13 +31,17 @@ export function proxy(request: NextRequest) {
   if (isAppHost && !pathname.startsWith("/app")) {
     const url = request.nextUrl.clone();
     url.pathname = `/app${pathname === "/" ? "" : pathname}`;
-    return NextResponse.rewrite(url);
+    const res = NextResponse.rewrite(url);
+    res.headers.set("x-middleware-rewrite", "1");
+    return res;
   }
 
   if (isControlHost && !pathname.startsWith("/control")) {
     const url = request.nextUrl.clone();
     url.pathname = `/control${pathname === "/" ? "" : pathname}`;
-    return NextResponse.rewrite(url);
+    const res = NextResponse.rewrite(url);
+    res.headers.set("x-middleware-rewrite", "1");
+    return res;
   }
 
   return NextResponse.next();

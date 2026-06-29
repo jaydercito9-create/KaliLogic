@@ -4,18 +4,16 @@ import { createServerClient } from "@supabase/ssr";
 import { proxy } from "./src/proxy";
 
 export async function middleware(request: NextRequest) {
-  // 1. Intentar aplicar proxy de subdominios (solo afecta si el host coincide con app. o control.)
-  const proxyResponse = proxy(request);
-  // Si el proxy decidió reescribir (retorna respuesta distinta), la usamos.
-  // En la mayoría de casos (vercel.app, localhost normal) proxy solo hace next().
-  if (proxyResponse && proxyResponse.headers.get("x-middleware-rewrite")) {
-    // El proxy ya manejó rewrite
+  // 1. Domain/host based routing (app. and control.) — safe no-op on vercel.app for now
+  const proxyResult = proxy(request);
+
+  // If proxy performed a rewrite (pathname changed), return it immediately
+  if (proxyResult && proxyResult.headers.get("x-middleware-rewrite")) {
+    return proxyResult;
   }
 
-  // 2. Manejo de sesión de Supabase (OBLIGATORIO para auth)
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  // 2. Supabase Auth session handling (required for getUser, cookies, etc.)
+  const supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,21 +24,15 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({
-            request,
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
         },
       },
     }
   );
 
-  // Importante: refresca la sesión del usuario en cada request
+  // Refresh auth session on every request
   await supabase.auth.getUser();
 
   return supabaseResponse;
@@ -49,11 +41,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, etc)
+     * Match all request paths except static files, images, etc.
      */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],

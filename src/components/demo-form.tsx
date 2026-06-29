@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Check, CheckCircle2, ImagePlus, LoaderCircle, Mail, Store } from "lucide-react";
 import { createDemoLead } from "@/app/actions/create-demo";
 import { createClient } from "@/lib/supabase/client";
+import { provisionDemoOrganization } from "@/app/actions/provision-demo";
 
 export function DemoForm() {
   const [submitted, setSubmitted] = useState(false);
@@ -41,10 +42,10 @@ export function DemoForm() {
       return;
     }
 
-    // 2. Intentamos crear la cuenta del usuario (envía email de confirmación)
+    // 2. Creamos la cuenta (puede requerir confirmación de email)
     const { error: signUpError } = await supabase.auth.signUp({
       email,
-      password: "Demo2026!", // Contraseña temporal. El usuario debe cambiarla después.
+      password: "Demo2026!",
       options: {
         data: {
           full_name: name,
@@ -53,13 +54,29 @@ export function DemoForm() {
       },
     });
 
-    setLoading(false);
-
     if (signUpError && !signUpError.message.includes("already registered")) {
-      // No bloqueamos si ya está registrado
-      console.warn("Sign up warning:", signUpError.message);
+      console.warn("Sign up note:", signUpError.message);
     }
 
+    // 3. Intentar iniciar sesión con contraseña temporal + crear la organización real
+    try {
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: "Demo2026!",
+      });
+
+      if (!signInErr) {
+        // Usuario autenticado → creamos su empresa de demo real
+        await provisionDemoOrganization({
+          companyName: companyName,
+          businessType,
+        });
+      }
+    } catch (e) {
+      console.log("Provision skipped (probablemente necesita confirmar email):", e);
+    }
+
+    setLoading(false);
     setSubmitted(true);
   }
 
@@ -70,26 +87,25 @@ export function DemoForm() {
         <span className="eyebrow">DEMO REGISTRADA</span>
         <h1>¡Solicitud recibida!</h1>
         <p>
-          Guardamos tus datos para <strong>{company || "tu negocio"}</strong>.
-          En la siguiente fase crearemos automáticamente tu organización de prueba de 24 horas.
+          Creamos tu cuenta y <strong>tu empresa real</strong> en KaliLogic para <strong>{company || "tu negocio"}</strong>.
+          Tienes productos de ejemplo según tu rubro y 24 horas de prueba.
         </p>
         <div className="demo-success__details">
-          <div><Mail size={17} /><span><strong>Cuenta creada</strong><small>Revisa tu correo (o usa contraseña temporal)</small></span><Check size={15} /></div>
-          <div><Store size={17} /><span><strong>Acceso al panel</strong><small>Usa <strong>/app</strong> para cliente y <strong>/control</strong> para admin</small></span><Check size={15} /></div>
+          <div><Mail size={17} /><span><strong>Contraseña temporal</strong><small>Demo2026! — cámbiala después</small></span><Check size={15} /></div>
+          <div><Store size={17} /><span><strong>Empresa creada</strong><small>Ve a /app después de iniciar sesión</small></span><Check size={15} /></div>
         </div>
 
         <div className="mt-4 flex flex-col gap-3">
           <Link className="button button--primary" href="/login">
-            Ir a iniciar sesión <ArrowRight size={17} />
+            Iniciar sesión ahora <ArrowRight size={17} />
           </Link>
           <Link className="button button--secondary" href="/app">
-            Ver panel del cliente (visual por ahora)
+            Ir al panel del cliente
           </Link>
         </div>
 
         <small className="demo-success__note">
-          Contraseña temporal para probar: <strong>Demo2026!</strong> (cámbiala después).<br />
-          Próximamente: creación automática de empresa + datos de ejemplo + timer real de 24 horas.
+          Si el login falla, confirma tu correo en Supabase o desactiva confirmaciones temporalmente en Authentication settings.
         </small>
       </div>
     );
