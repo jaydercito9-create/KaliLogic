@@ -14,6 +14,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
+  const nextPath = () => {
+    const value = new URLSearchParams(window.location.search).get("next") ?? "/app";
+    return /^\/billing\/(basic|premium|plus)$/.test(value) ? value : "/app";
+  };
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -51,7 +55,7 @@ export default function LoginPage() {
       }
     } catch {}
 
-    router.push("/app");
+    router.push(nextPath());
   }
 
   async function sendMagicLink() {
@@ -66,7 +70,7 @@ export default function LoginPage() {
       email,
       options: {
         // Legacy token_hash flow (no PKCE)
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/app`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}`,
         shouldCreateUser: false,
       },
     });

@@ -8,9 +8,11 @@ export async function GET(request: NextRequest) {
   const token = url.searchParams.get("token");
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") || "signup";
+  const requestedNext = url.searchParams.get("next") ?? "/app";
   const provisionDemo = url.searchParams.get("provision") === "demo";
 
-  const supabaseResponse = NextResponse.redirect(new URL("/app", url.origin));
+  const next = /^\/billing\/(basic|premium|plus)$/.test(requestedNext) ? requestedNext : "/app";
+  const supabaseResponse = NextResponse.redirect(new URL(next, url.origin));
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

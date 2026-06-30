@@ -3,7 +3,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   Building2,
-  Clock3,
   CreditCard,
   Headphones,
   Plus,
@@ -52,19 +51,24 @@ export default async function ControlPage() {
   let plans: Plan[] = [];
   let leadsCount = 0;
   let orgsCount = 0;
+  let subscriptionsCount = 0;
+  let mrr = 0;
 
   try {
-    const [recentLeads, recentOrgs, leadTotal, activePlans] = await Promise.all([
+    const [recentLeads, recentOrgs, leadTotal, activePlans, subscriptions] = await Promise.all([
       supabase.from("leads").select("id, full_name, company_name, email, business_type, created_at").order("created_at", { ascending: false }).limit(8),
       supabase.rpc("admin_list_organizations"),
       supabase.from("leads").select("id", { count: "exact", head: true }),
       supabase.from("plans").select("code, name").eq("is_active", true).order("monthly_price"),
+      supabase.from("subscriptions").select("plans(monthly_price)").eq("status", "authorized"),
     ]);
     leads = (recentLeads.data || []) as Lead[];
     orgs = (recentOrgs.data || []) as Organization[];
     plans = (activePlans.data || []) as Plan[];
     leadsCount = leadTotal.count ?? 0;
     orgsCount = orgs.length;
+    subscriptionsCount = subscriptions.data?.length ?? 0;
+    mrr = (subscriptions.data ?? []).reduce((sum, row) => sum + Number((row.plans as unknown as { monthly_price?: number } | null)?.monthly_price ?? 0), 0);
   } catch (e) {
     console.error("Error loading /control data (check Supabase env vars in Vercel):", e);
   }
@@ -78,8 +82,8 @@ export default async function ControlPage() {
       <div className="page-heading admin-heading">
         <div><span>Centro de control</span><h1>Hola, Kalil. Todo marcha bien.</h1><p>Supervisa KaliLogic y entra a tu propia tienda desde el mismo lugar.</p></div>
         <div className="page-heading__actions">
-          <button className="button button--secondary"><Clock3 size={16} /> Exportar resumen</button>
-          <button className="button button--primary"><Plus size={17} /> Nueva empresa</button>
+          <a className="button button--secondary" href="https://wa.me/51948097148?text=Hola%2C%20vengo%20desde%20el%20panel%20KaliLogic%20y%20necesito%20soporte." target="_blank" rel="noreferrer"><Headphones size={16} /> Soporte</a>
+          <Link className="button button--primary" href="/demo"><Plus size={17} /> Nueva empresa</Link>
         </div>
       </div>
 
@@ -102,20 +106,20 @@ export default async function ControlPage() {
           <p>De /demo</p>
         </article>
         <article className="kpi-card">
-          <div><span className="kpi-card__icon kpi-card__icon--cyan"><Sparkles size={20} /></span><small>Próximamente</small></div>
-          <strong>MRR</strong>
+          <div><span className="kpi-card__icon kpi-card__icon--cyan"><Sparkles size={20} /></span><small>MRR</small></div>
+          <strong>S/ {mrr.toFixed(2)}</strong>
           <p>Ingresos recurrentes</p>
         </article>
         <article className="kpi-card">
-          <div><span className="kpi-card__icon kpi-card__icon--orange"><CreditCard size={20} /></span><small>Próximamente</small></div>
-          <strong>Suscripciones</strong>
+          <div><span className="kpi-card__icon kpi-card__icon--orange"><CreditCard size={20} /></span><small>Suscripciones</small></div>
+          <strong>{subscriptionsCount}</strong>
           <p>Planes activos</p>
         </article>
       </section>
 
       <section className="dashboard-grid admin-bottom-grid">
-        <article className="panel-card companies-card">
-          <div className="panel-card__heading"><div><h2>Organizaciones recientes</h2><p>Datos reales de Supabase</p></div><button className="panel-link panel-link--plain">Ver todas <ArrowRight size={14} /></button></div>
+        <article className="panel-card companies-card" id="companies">
+          <div className="panel-card__heading"><div><h2>Organizaciones recientes</h2><p>Datos reales de Supabase</p></div></div>
           <div className="data-table-wrap">
             <table className="data-table admin-table">
               <thead><tr><th>EMPRESA</th><th>ESTADO REAL</th><th>PLAN</th><th>CONTROL</th></tr></thead>
@@ -152,7 +156,7 @@ export default async function ControlPage() {
           </div>
         </article>
 
-        <article className="panel-card activity-card">
+        <article className="panel-card activity-card" id="leads">
           <div className="panel-card__heading"><div><h2>Leads recientes</h2><p>De personas que llenaron /demo</p></div><Headphones size={17} /></div>
           <div className="admin-tasks">
             {leads.length > 0 ? leads.slice(0, 5).map((lead) => (

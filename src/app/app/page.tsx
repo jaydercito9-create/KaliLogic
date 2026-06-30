@@ -13,10 +13,10 @@ import {
   ShoppingCart,
   UserPlus,
   WalletCards,
-  Wrench,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { VentasModule } from "@/components/ventas-module";
+import { CashModule, CategoriesModule, CustomersModule, InventoryModule as OperationalInventory, ProductsModule as OperationalProducts, ReportsModule, SettingsModule, SuppliersModule } from "@/components/business-modules";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -144,13 +144,21 @@ async function DashboardHome({ user, orgName, orgId, supabase }: { user: User; o
   let productsCount = 0;
   let lowStock: LowStockItem[] = [];
   let lowStockCount = 0;
+  let salesToday = 0;
+  let cashToday = 0;
 
   try {
-    const { count } = await supabase
-      .from("products")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", orgId);
+    const limaDayStart = new Date();
+    limaDayStart.setUTCHours(5, 0, 0, 0);
+    if (limaDayStart > new Date()) limaDayStart.setUTCDate(limaDayStart.getUTCDate() - 1);
+    const [{ count }, { data: sales }, { data: cash }] = await Promise.all([
+      supabase.from("products").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
+      supabase.from("sales").select("total").eq("organization_id", orgId).eq("status", "completed").gte("created_at", limaDayStart.toISOString()),
+      supabase.from("cash_movements").select("movement_type,amount").eq("organization_id", orgId).gte("created_at", limaDayStart.toISOString()),
+    ]);
     productsCount = count ?? 0;
+    salesToday = (sales ?? []).reduce((sum, row) => sum + Number(row.total), 0);
+    cashToday = (cash ?? []).reduce((sum, row) => sum + Number(row.amount) * (row.movement_type === "income" ? 1 : -1), 0);
 
     if (orgId && productsCount > 0) {
       const [{ data: balances }, { count }] = await Promise.all([
@@ -209,13 +217,13 @@ async function DashboardHome({ user, orgName, orgId, supabase }: { user: User; o
         </article>
         <article className="kpi-card">
           <div><span className="kpi-card__icon kpi-card__icon--cyan"><ShoppingCart size={20} /></span><small>Ventas</small></div>
-          <strong>—</strong>
-          <p>Próximamente</p>
+          <strong>S/ {salesToday.toFixed(2)}</strong>
+          <p>Hoy</p>
         </article>
         <article className="kpi-card">
           <div><span className="kpi-card__icon kpi-card__icon--orange"><WalletCards size={20} /></span><small>Caja</small></div>
-          <strong>—</strong>
-          <p>Próximamente</p>
+          <strong>S/ {cashToday.toFixed(2)}</strong>
+          <p>Movimientos de hoy</p>
         </article>
       </section>
 
@@ -259,7 +267,7 @@ async function DashboardHome({ user, orgName, orgId, supabase }: { user: User; o
 export default async function ClientDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ modulo?: string }>;
+  searchParams: Promise<{ modulo?: string; saved?: string; error?: string; org?: string; billing?: string }>;
 }) {
   const params = await searchParams;
   const modulo = params.modulo || "dashboard";
@@ -275,14 +283,13 @@ export default async function ClientDashboardPage({
   let features: string[] = [];
 
   try {
-    const { data: membership } = await supabase
+    let membershipQuery = supabase
       .from("memberships")
       .select("organization_id, organizations(name, is_internal)")
       .eq("user_id", user.id)
-      .eq("is_active", true)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .eq("is_active", true);
+    if (params.org) membershipQuery = membershipQuery.eq("organization_id", params.org);
+    const { data: membership } = await membershipQuery.order("created_at", { ascending: true }).limit(1).maybeSingle();
 
     const org = membership?.organizations as { name?: string; is_internal?: boolean } | null;
     if (org) orgName = org.name || "Tu Negocio";
@@ -331,14 +338,17 @@ export default async function ClientDashboardPage({
 
   return (
     <DashboardShell mode="client" active={activeKey} orgId={orgId} entitlement={entitlement} features={features}>
+      {params.saved && <p className="status-pill status-pill--success" style={{ marginBottom: 16 }}>Cambios guardados.</p>}
+      {params.billing && <p className="status-pill status-pill--warning" style={{ marginBottom: 16 }}>Estamos confirmando tu pago con Mercado Pago.</p>}
+      {params.error && <p className="status-pill status-pill--warning" style={{ marginBottom: 16 }}>{params.error}</p>}
       {modulo === "dashboard" && (
         <DashboardHome user={user} orgName={orgName} orgId={orgId} supabase={supabase} />
       )}
       {modulo === "productos" && orgId && canAccessModule && (
-        <ProductosModule orgId={orgId} supabase={supabase} />
+        <OperationalProducts orgId={orgId} supabase={supabase} />
       )}
       {modulo === "inventario" && orgId && canAccessModule && (
-        <InventarioModule orgId={orgId} supabase={supabase} />
+        <OperationalInventory orgId={orgId} supabase={supabase} />
       )}
       {modulo === "ventas" && orgId && canAccessModule && (
         <VentasModule orgId={orgId} />
@@ -346,24 +356,12 @@ export default async function ClientDashboardPage({
       {modulo !== "dashboard" && !canAccessModule && (
         <ComingSoon modulo="Acceso restringido" icon={Clock3} desc="Tu trial o suscripción no está activo. Reactiva el acceso antes de registrar ventas." />
       )}
-      {modulo === "clientes" && canAccessModule && (
-        <ComingSoon modulo="Clientes" icon={UserPlus} desc="Gestiona tu base de clientes, historial de compras y datos de contacto." />
-      )}
-      {modulo === "caja" && canAccessModule && (
-        <ComingSoon modulo="Caja y movimientos" icon={WalletCards} desc="Registra ingresos y gastos, cierra la caja diaria y revisa el balance." />
-      )}
-      {modulo === "categorias" && canAccessModule && (
-        <ComingSoon modulo="Categorías y marcas" icon={Wrench} desc="Organiza tu catálogo por categorías y marcas para búsquedas más rápidas." />
-      )}
-      {modulo === "proveedores" && canAccessModule && (
-        <ComingSoon modulo="Proveedores" icon={Wrench} desc="Administra tus proveedores, órdenes de compra y costos de abastecimiento." />
-      )}
-      {modulo === "reportes" && canAccessModule && (
-        <ComingSoon modulo="Reportes" icon={Wrench} desc="Reportes de ventas, stock, caja y rentabilidad con gráficas detalladas." />
-      )}
-      {modulo === "configuracion" && canAccessModule && (
-        <ComingSoon modulo="Configuración" icon={Wrench} desc="Ajusta los datos de tu empresa, usuarios, permisos y preferencias del sistema." />
-      )}
+      {modulo === "clientes" && orgId && canAccessModule && <CustomersModule orgId={orgId} supabase={supabase} />}
+      {modulo === "caja" && orgId && canAccessModule && <CashModule orgId={orgId} supabase={supabase} />}
+      {modulo === "categorias" && orgId && canAccessModule && <CategoriesModule orgId={orgId} supabase={supabase} />}
+      {modulo === "proveedores" && orgId && canAccessModule && <SuppliersModule orgId={orgId} supabase={supabase} />}
+      {modulo === "reportes" && orgId && canAccessModule && <ReportsModule orgId={orgId} supabase={supabase} />}
+      {modulo === "configuracion" && orgId && canAccessModule && <SettingsModule orgId={orgId} supabase={supabase} />}
     </DashboardShell>
   );
 }

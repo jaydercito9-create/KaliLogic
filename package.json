@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test tests/sale.test.mjs",
+    "test": "node --test tests/sale.test.mjs tests/webhook.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

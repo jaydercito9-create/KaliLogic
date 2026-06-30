@@ -38,6 +38,8 @@ export default async function MyBusinessPage() {
   let orgId: string | null = null;
   let productos: Product[] = [];
   let productCount = 0;
+  let salesTotal = 0;
+  let cashBalance = 0;
 
   const { data: membership } = await supabase
     .from("memberships")
@@ -63,16 +65,20 @@ export default async function MyBusinessPage() {
   }
 
   if (orgId) {
-    const [recent, total] = await Promise.all([
+    const [recent, total, sales, cash] = await Promise.all([
       supabase.from("products").select("id, name, sku, sale_price, category").eq("organization_id", orgId).limit(10),
       supabase.from("products").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
+      supabase.from("sales").select("total").eq("organization_id", orgId).eq("status", "completed"),
+      supabase.from("cash_movements").select("movement_type,amount").eq("organization_id", orgId),
     ]);
     productos = (recent.data || []) as Product[];
     productCount = total.count ?? 0;
+    salesTotal = (sales.data ?? []).reduce((sum, row) => sum + Number(row.total), 0);
+    cashBalance = (cash.data ?? []).reduce((sum, row) => sum + Number(row.amount) * (row.movement_type === "income" ? 1 : -1), 0);
   }
 
   return (
-    <DashboardShell mode="control" active="my-store">
+    <DashboardShell mode="control" active="my-store" orgId={orgId ?? undefined}>
       <div className="business-context-bar">
         <Link href="/control"><ArrowLeft size={14} /> Volver a KaliLogic</Link>
         <span><i /> Estás administrando tu empresa: <strong>{tiendaName}</strong></span>
@@ -80,24 +86,24 @@ export default async function MyBusinessPage() {
 
       <div className="page-heading">
         <div><span>Mi empresa</span><h1>Operación de mi tienda</h1><p>El mismo control que ofreces a tus clientes, dentro de tu panel principal.</p></div>
-        <div className="page-heading__actions"><button className="button button--secondary"><Package size={16} /> Nuevo producto</button><button className="button button--primary"><Plus size={17} /> Nueva venta</button></div>
+        <div className="page-heading__actions"><Link className="button button--secondary" href={`/app?modulo=productos&org=${orgId}`}><Package size={16} /> Nuevo producto</Link><Link className="button button--primary" href={`/app?modulo=ventas&org=${orgId}`}><Plus size={17} /> Nueva venta</Link></div>
       </div>
 
       <section className="kpi-grid">
         <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--blue"><CircleDollarSign size={20} /></span><small>Productos</small></div><strong>{productCount}</strong><p>Total real</p></article>
         <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--violet"><Boxes size={20} /></span><small>Catálogo</small></div><strong>Real</strong><p>Tu tienda</p></article>
-        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--cyan"><ShoppingCart size={20} /></span><small>Ventas</small></div><strong>—</strong><p>Próximamente</p></article>
-        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--orange"><WalletCards size={20} /></span><small>Caja</small></div><strong>—</strong><p>Próximamente</p></article>
+        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--cyan"><ShoppingCart size={20} /></span><small>Ventas</small></div><strong>S/ {salesTotal.toFixed(2)}</strong><p>Total real</p></article>
+        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--orange"><WalletCards size={20} /></span><small>Caja</small></div><strong>S/ {cashBalance.toFixed(2)}</strong><p>Balance real</p></article>
       </section>
 
       <section className="dashboard-grid own-store-grid">
         <article className="panel-card own-store-shortcuts">
           <div className="panel-card__heading"><div><h2>Administrar mi negocio</h2><p>Accesos principales de tu propia tienda</p></div><Store size={18} /></div>
           <div className="store-module-grid">
-            <Link href="/control/mi-negocio?modulo=ventas"><span><ShoppingCart size={21} /></span><strong>Ventas</strong><small>Punto de venta y devoluciones</small></Link>
-            <Link href="/control/mi-negocio?modulo=productos"><span><Package size={21} /></span><strong>Productos</strong><small>Catálogo, precios y variantes</small></Link>
-            <Link href="/control/mi-negocio?modulo=inventario"><span><Boxes size={21} /></span><strong>Inventario</strong><small>Stock y movimientos</small></Link>
-            <Link href="/control/mi-negocio?modulo=caja"><span><WalletCards size={21} /></span><strong>Caja</strong><small>Ingresos, gastos y cierre</small></Link>
+            <Link href={`/app?modulo=ventas&org=${orgId}`}><span><ShoppingCart size={21} /></span><strong>Ventas</strong><small>Punto de venta y devoluciones</small></Link>
+            <Link href={`/app?modulo=productos&org=${orgId}`}><span><Package size={21} /></span><strong>Productos</strong><small>Catálogo, precios y variantes</small></Link>
+            <Link href={`/app?modulo=inventario&org=${orgId}`}><span><Boxes size={21} /></span><strong>Inventario</strong><small>Stock y movimientos</small></Link>
+            <Link href={`/app?modulo=caja&org=${orgId}`}><span><WalletCards size={21} /></span><strong>Caja</strong><small>Ingresos, gastos y cierre</small></Link>
           </div>
         </article>
 

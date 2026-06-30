@@ -19,6 +19,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { createClient } from "@/lib/supabase/server";
 
 const features = [
   {
@@ -56,12 +57,14 @@ const businessTypes = [
 
 const plans = [
   {
+    code: "basic",
     name: "Básico",
     price: "49",
     description: "Para empezar a ordenar tu negocio.",
     features: ["1 sucursal", "2 usuarios", "Hasta 2,500 SKU", "Inventario y ventas", "Reportes básicos"],
   },
   {
+    code: "premium",
     name: "Premium",
     price: "99",
     description: "Para negocios que ya están creciendo.",
@@ -69,6 +72,7 @@ const plans = [
     features: ["2 sucursales", "5 usuarios", "Hasta 15,000 SKU", "Compras y proveedores", "Importación desde Excel"],
   },
   {
+    code: "plus",
     name: "Plus",
     price: "179",
     description: "Más control para equipos consolidados.",
@@ -76,7 +80,16 @@ const plans = [
   },
 ];
 
-export default function MarketingPage() {
+export default async function MarketingPage({ searchParams }: { searchParams: Promise<{ billing?: string }> }) {
+  const params = await searchParams;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  let orgName = "Por completar";
+  if (user) {
+    const { data } = await supabase.from("memberships").select("organizations(name)").eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
+    orgName = (data?.organizations as unknown as { name?: string } | null)?.name ?? orgName;
+  }
+  const enterpriseMessage = encodeURIComponent(`Hola, vengo desde KaliLogic.\nQuiero una solución Enterprise personalizada para mi negocio.\nMi nombre es: ${user?.user_metadata?.full_name ?? "Por completar"}\nMi organización: ${orgName}`);
   return (
     <main className="marketing-page">
       <header className="marketing-nav">
@@ -145,7 +158,7 @@ export default function MarketingPage() {
               <div className="preview-dashboard">
                 <div className="preview-dashboard__heading">
                   <div><small>Buenos días, Lucía</small><strong>Resumen de tu negocio</strong></div>
-                  <button>+ Nueva venta</button>
+                  <span className="preview-action">+ Nueva venta</span>
                 </div>
                 <div className="preview-kpis">
                   <article><span>Ventas de hoy</span><strong>S/ 2,840</strong><small>↗ 18.4%</small></article>
@@ -234,7 +247,7 @@ export default function MarketingPage() {
           <div className="business-visual">
             <div className="business-visual__header">
               <div><span className="product-dot product-dot--blue" /> Catálogo de productos</div>
-              <button>Agregar producto</button>
+              <span className="preview-action">Agregar producto</span>
             </div>
             <div className="business-visual__filters"><span>Todos</span><span>Ropa</span><span>Calzado</span><i /></div>
             {[
@@ -257,6 +270,7 @@ export default function MarketingPage() {
 
       <section className="pricing-section" id="planes">
         <div className="container">
+          {params.billing && <p className="status-pill status-pill--warning" style={{ marginBottom: 20 }}>{params.billing === "not_configured" ? "Configura las credenciales de Mercado Pago para contratar." : "No pudimos abrir el pago. Inténtalo nuevamente o contáctanos."}</p>}
           <div className="section-heading">
             <span className="eyebrow">PLANES TRANSPARENTES</span>
             <h2>Empieza simple. Crece cuando lo necesites.</h2>
@@ -269,8 +283,8 @@ export default function MarketingPage() {
                 <h3>{plan.name}</h3>
                 <p>{plan.description}</p>
                 <div className="price"><small>S/</small><strong>{plan.price}</strong><span>/mes</span></div>
-                <Link className={plan.featured ? "button button--primary" : "button button--secondary"} href="/demo">
-                  Comenzar prueba
+                <Link className={plan.featured ? "button button--primary" : "button button--secondary"} href={`/billing/${plan.code}`}>
+                  Contratar {plan.name}
                 </Link>
                 <ul>
                   {plan.features.map((feature) => <li key={feature}><Check size={15} /> {feature}</li>)}
@@ -280,9 +294,10 @@ export default function MarketingPage() {
             <article className="enterprise-card">
               <div><span className="eyebrow">ENTERPRISE</span><h3>¿Necesitas algo a tu medida?</h3></div>
               <p>Dominio propio, más sucursales, integraciones o una solución personalizada para tu operación.</p>
-              <a className="button button--secondary" href="https://wa.me/51" target="_blank" rel="noreferrer">
+              <a className="button button--secondary" href={`https://wa.me/51948097148?text=${enterpriseMessage}`} target="_blank" rel="noreferrer">
                 Conversar con KaliLogic <ArrowRight size={16} />
               </a>
+              <a href="mailto:jaydercastillorosales102@gmail.com">Correo alternativo</a>
             </article>
           </div>
         </div>
@@ -311,8 +326,8 @@ export default function MarketingPage() {
         <div className="container marketing-footer__top">
           <div><BrandLogo inverse /><p>Gestión simple para negocios que quieren avanzar.</p></div>
           <div><strong>Producto</strong><a href="#funciones">Funciones</a><a href="#planes">Planes</a><Link href="/demo">Demo</Link></div>
-          <div><strong>Compañía</strong><a href="#negocios">Nosotros</a><a href="#preguntas">Preguntas</a><a href="mailto:hola@kalilogic.pe">Contacto</a></div>
-          <div><strong>Legal</strong><a href="#">Privacidad</a><a href="#">Términos</a><a href="#">Seguridad</a></div>
+          <div><strong>Compañía</strong><a href="#negocios">Nosotros</a><a href="#preguntas">Preguntas</a><a href="mailto:jaydercastillorosales102@gmail.com">Contacto</a></div>
+          <div><strong>Legal</strong><span>Privacidad</span><span>Términos</span><span>Seguridad</span></div>
         </div>
         <div className="container marketing-footer__bottom"><span>© 2026 KaliLogic. Todos los derechos reservados.</span><span>Hecho con dedicación en Perú 🇵🇪</span></div>
       </footer>

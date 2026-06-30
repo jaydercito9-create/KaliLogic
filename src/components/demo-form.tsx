@@ -35,11 +35,13 @@ export function DemoForm() {
       return;
     }
 
+    const plan = new URLSearchParams(window.location.search).get("plan");
+    const next = plan && ["basic", "premium", "plus"].includes(plan) ? `/billing/${plan}` : "/app";
     const { error: otpError } = await createClient().auth.signInWithOtp({
       email: result.email as string,
       options: {
         // Legacy token_hash flow (no PKCE)
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/app&provision=demo`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}&provision=demo`,
         shouldCreateUser: true,
         data: { full_name: fullName.trim(), phone: phone.replace(/\D/g, "") },
       },

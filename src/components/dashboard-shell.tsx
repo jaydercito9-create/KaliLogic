@@ -8,21 +8,17 @@ import {
   Boxes,
   Building2,
   ChevronDown,
-  CircleDollarSign,
-  CreditCard,
   Headphones,
   LayoutDashboard,
   LogOut,
   Menu,
   Package,
-  ReceiptText,
   Search,
   Settings,
   ShoppingCart,
   Sparkles,
   Store,
   Tags,
-  TicketPercent,
   Users,
   WalletCards,
   X,
@@ -30,6 +26,7 @@ import {
 import { BrandLogo } from "@/components/brand-logo";
 import { createClient } from "@/lib/supabase/client";
 import { NotificacionesBell } from "@/components/notificaciones-bell";
+import { EntitlementRefresh } from "@/components/entitlement-refresh";
 
 type ShellMode = "client" | "control";
 
@@ -95,20 +92,9 @@ const controlSections: { label: string; items: NavItem[] }[] = [
     label: "KALILOGIC",
     items: [
       { key: "platform", label: "Vista general", icon: LayoutDashboard, href: "/control" },
-      { key: "companies", label: "Empresas", icon: Building2, href: "/control?modulo=empresas" },
-      { key: "demos", label: "Demos y leads", icon: Sparkles, href: "/control?modulo=demos" },
-      { key: "subscriptions", label: "Suscripciones", icon: CreditCard, href: "/control?modulo=suscripciones" },
-      { key: "payments", label: "Pagos", icon: CircleDollarSign, href: "/control?modulo=pagos" },
-      { key: "plans", label: "Planes y cupones", icon: TicketPercent, href: "/control?modulo=planes" },
-    ],
-  },
-  {
-    label: "OPERACIÓN",
-    items: [
-      { key: "support", label: "Soporte", icon: Headphones, href: "/control?modulo=soporte" },
-      { key: "finance", label: "Finanzas KaliLogic", icon: ReceiptText, href: "/control?modulo=finanzas" },
-      { key: "audit", label: "Registro de actividad", icon: BarChart3, href: "/control?modulo=auditoria" },
-      { key: "settings", label: "Configuración", icon: Settings, href: "/control?modulo=configuracion" },
+      { key: "companies", label: "Empresas", icon: Building2, href: "/control#companies" },
+      { key: "demos", label: "Demos y leads", icon: Sparkles, href: "/control#leads" },
+      { key: "support", label: "Soporte", icon: Headphones, href: "https://wa.me/51948097148?text=Hola%2C%20necesito%20soporte%20con%20KaliLogic." },
     ],
   },
 ];
@@ -146,6 +132,7 @@ export function DashboardShell({ mode, active = "dashboard", orgId, entitlement,
 
   return (
     <div className={`dashboard-shell ${open ? "dashboard-shell--open" : ""}`}>
+      {orgId && <EntitlementRefresh orgId={orgId} />}
       <aside className="dashboard-sidebar">
         <div className="dashboard-sidebar__brand">
           <BrandLogo inverse href={isControl ? "/control" : "/app"} />
@@ -176,7 +163,7 @@ export function DashboardShell({ mode, active = "dashboard", orgId, entitlement,
                 <Link
                   key={key}
                   className={active === key ? "nav-item nav-item--active" : "nav-item"}
-                  href={href}
+                  href={!isControl && orgId ? `${href}${href.includes("?") ? "&" : "?"}org=${orgId}` : href}
                   onClick={() => setOpen(false)}
                 >
                   <Icon size={17} />

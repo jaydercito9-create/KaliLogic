@@ -475,8 +475,7 @@ a {
   letter-spacing: -0.025em;
 }
 
-.preview-dashboard__heading button,
-.business-visual__header button {
+.preview-action {
   border: 0;
   border-radius: 7px;
   padding: 8px 11px;
