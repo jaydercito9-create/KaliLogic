@@ -272,6 +272,7 @@ export default async function ClientDashboardPage({
   let orgId = "";
   let entitlement = { label: "Sin plan", state: "Pendiente", detail: "Completa la activación de tu empresa" };
   let canWrite = false;
+  let features: string[] = [];
 
   try {
     const { data: membership } = await supabase
@@ -289,12 +290,14 @@ export default async function ClientDashboardPage({
 
     if (orgId) {
       const { data: access } = await supabase.rpc("get_organization_entitlement", { p_organization_id: orgId }).single();
-      const status = access as { state: string; plan_name: string | null; expires_at: string | null } | null;
+      const status = access as { state: string; plan_name: string | null; expires_at: string | null; features: unknown; can_write: boolean } | null;
       if (status) {
-        canWrite = status.state === "trial" || status.state === "paid";
+        canWrite = status.can_write;
+        features = Array.isArray(status.features) ? status.features.filter((value): value is string => typeof value === "string") : [];
+        const stateLabel = ({ trial: "Trial activo", active: "Pagado", unpaid: "Pago pendiente", suspended: "Suspendido", cancelled: "Cancelado", expired: "Vencido" } as Record<string, string>)[status.state] ?? status.state;
         entitlement = {
           label: status.plan_name ? `${status.state === "trial" ? "Trial" : "Plan"} ${status.plan_name}` : "Sin plan",
-          state: status.state === "trial" ? "Activo" : status.state === "paid" ? "Pagado" : status.state === "suspended" ? "Suspendido" : "Vencido",
+          state: stateLabel,
           detail: status.expires_at ? `Válido hasta ${new Intl.DateTimeFormat("es-PE", { dateStyle: "medium" }).format(new Date(status.expires_at))}` : "Acciones críticas bloqueadas",
         };
       }
@@ -313,39 +316,52 @@ export default async function ClientDashboardPage({
     : modulo === "configuracion" ? "settings"
     : "dashboard";
 
+  const requiredFeature = ({
+    productos: "inventory",
+    inventario: "inventory",
+    categorias: "inventory",
+    ventas: "sales",
+    clientes: "customers",
+    caja: "cash",
+    proveedores: "suppliers",
+    reportes: "reports",
+    configuracion: "settings",
+  } as Record<string, string>)[modulo];
+  const canAccessModule = !requiredFeature || (canWrite && features.includes(requiredFeature));
+
   return (
-    <DashboardShell mode="client" active={activeKey} orgId={orgId} entitlement={entitlement}>
+    <DashboardShell mode="client" active={activeKey} orgId={orgId} entitlement={entitlement} features={features}>
       {modulo === "dashboard" && (
         <DashboardHome user={user} orgName={orgName} orgId={orgId} supabase={supabase} />
       )}
-      {modulo === "productos" && orgId && (
+      {modulo === "productos" && orgId && canAccessModule && (
         <ProductosModule orgId={orgId} supabase={supabase} />
       )}
-      {modulo === "inventario" && orgId && (
+      {modulo === "inventario" && orgId && canAccessModule && (
         <InventarioModule orgId={orgId} supabase={supabase} />
       )}
-      {modulo === "ventas" && orgId && canWrite && (
+      {modulo === "ventas" && orgId && canAccessModule && (
         <VentasModule orgId={orgId} />
       )}
-      {modulo === "ventas" && orgId && !canWrite && (
+      {modulo !== "dashboard" && !canAccessModule && (
         <ComingSoon modulo="Acceso restringido" icon={Clock3} desc="Tu trial o suscripción no está activo. Reactiva el acceso antes de registrar ventas." />
       )}
-      {modulo === "clientes" && (
+      {modulo === "clientes" && canAccessModule && (
         <ComingSoon modulo="Clientes" icon={UserPlus} desc="Gestiona tu base de clientes, historial de compras y datos de contacto." />
       )}
-      {modulo === "caja" && (
+      {modulo === "caja" && canAccessModule && (
         <ComingSoon modulo="Caja y movimientos" icon={WalletCards} desc="Registra ingresos y gastos, cierra la caja diaria y revisa el balance." />
       )}
-      {modulo === "categorias" && (
+      {modulo === "categorias" && canAccessModule && (
         <ComingSoon modulo="Categorías y marcas" icon={Wrench} desc="Organiza tu catálogo por categorías y marcas para búsquedas más rápidas." />
       )}
-      {modulo === "proveedores" && (
+      {modulo === "proveedores" && canAccessModule && (
         <ComingSoon modulo="Proveedores" icon={Wrench} desc="Administra tus proveedores, órdenes de compra y costos de abastecimiento." />
       )}
-      {modulo === "reportes" && (
+      {modulo === "reportes" && canAccessModule && (
         <ComingSoon modulo="Reportes" icon={Wrench} desc="Reportes de ventas, stock, caja y rentabilidad con gráficas detalladas." />
       )}
-      {modulo === "configuracion" && (
+      {modulo === "configuracion" && canAccessModule && (
         <ComingSoon modulo="Configuración" icon={Wrench} desc="Ajusta los datos de tu empresa, usuarios, permisos y preferencias del sistema." />
       )}
     </DashboardShell>

@@ -1,33 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-/**
- * Robust Auth Callback Handler for Next.js App Router + Supabase SSR
- *
- * Supports BOTH flows that Supabase can send:
- *   1. PKCE flow:        ?code=...          → exchangeCodeForSession(code)
- *   2. OTP / Magic Link: ?token_hash=...&type=... → verifyOtp({ token_hash, type })
- *
- * This is the production-safe approach because Supabase can emit either
- * depending on project settings, client version, or email template.
- */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
 
   const code = url.searchParams.get("code");
-  const tokenHash = url.searchParams.get("token_hash") || url.searchParams.get("token");
-  const type = (url.searchParams.get("type") || "signup") as any;
-
-  let next = url.searchParams.get("next") ?? "/app";
+  const token = url.searchParams.get("token");
+  const tokenHash = url.searchParams.get("token_hash");
+  const type = url.searchParams.get("type") || "signup";
   const provisionDemo = url.searchParams.get("provision") === "demo";
 
-  // Strict sanitization: never allow redirect to /demo or external URLs
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next === "/demo") {
-    next = "/app";
-  }
-
-  // Create the response object FIRST so we can attach auth cookies to it
-  const supabaseResponse = NextResponse.redirect(new URL(next, url.origin));
+  const supabaseResponse = NextResponse.redirect(new URL("/app", url.origin));
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,44 +30,33 @@ export async function GET(request: NextRequest) {
   );
 
   try {
-    let authError: any = null;
-
+    // === Intercambio de sesión: soporta los dos flujos principales de Supabase ===
     if (code) {
-      // === PKCE FLOW ===
+      // PKCE (el que usa signInWithOtp + emailRedirectTo la mayoría de las veces)
       const { error } = await supabase.auth.exchangeCodeForSession(code);
-      authError = error;
-    } else if (tokenHash) {
-      // === OTP / MAGIC LINK / EMAIL CONFIRMATION FLOW ===
+      if (error) throw error;
+    } else if (tokenHash || token) {
+      // Token hash / OTP / confirmación de email tradicional
       const { error } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type,
+        token_hash: (tokenHash || token)!,
+        type: type as any,
       });
-      authError = error;
+      if (error) throw error;
     } else {
-      // No valid auth parameter present
-      console.warn("[/auth/callback] No code and no token_hash/token present");
-      return NextResponse.redirect(new URL("/login?error=auth_failed", url.origin));
-    }
-
-    if (authError) {
-      console.error("[/auth/callback] Auth exchange/verify error:", authError);
-      return NextResponse.redirect(new URL("/login?error=auth_failed", url.origin));
-    }
-
-    // Optional: run demo organization provisioning
-    if (provisionDemo) {
-      try {
-        const { error: provError } = await supabase.rpc("provision_demo_organization");
-        if (provError) {
-          console.error("[/auth/callback] provision_demo_organization error (non-fatal):", provError.message);
-          // We do NOT block login on provisioning errors
-        }
-      } catch (provErr) {
-        console.error("[/auth/callback] provision error:", provErr);
+      // Sin parámetros → verificamos si ya hay sesión
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Missing code or token_hash in callback");
       }
     }
 
-    // Platform admin override → /control
+    // Provisioning del demo (solo cuando viene del formulario /demo)
+    if (provisionDemo) {
+      const { error: provisionError } = await supabase.rpc("provision_demo_organization");
+      if (provisionError) throw provisionError;
+    }
+
+    // Redirección de administradores de plataforma
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -104,8 +76,10 @@ export async function GET(request: NextRequest) {
     }
 
     return supabaseResponse;
+
   } catch (err) {
-    console.error("[/auth/callback] unexpected error:", err);
+    console.error("[/auth/callback] fatal error during exchange/provision:", err);
+    // Siempre devolvemos un redirect, nunca dejamos que Next lance 500 o 404 extraño
     return NextResponse.redirect(new URL("/login?error=auth_failed", url.origin));
   }
 }

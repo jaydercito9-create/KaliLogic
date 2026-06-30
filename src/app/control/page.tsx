@@ -6,7 +6,6 @@ import {
   Clock3,
   CreditCard,
   Headphones,
-  MoreHorizontal,
   Plus,
   Sparkles,
   Store,
@@ -14,11 +13,23 @@ import {
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { createClient } from "@/lib/supabase/server";
+import { manageOrganization } from "@/app/control/actions";
 
 export const metadata: Metadata = { title: "Control de plataforma" };
 
 type Lead = { id: string; full_name: string; company_name: string; email: string; business_type: string; created_at: string };
-type Organization = { id: string; name: string; business_type: string; status: string; created_at: string };
+type Organization = {
+  id: string;
+  name: string;
+  business_type: string;
+  organization_status: string;
+  access_state: string;
+  plan_code: string | null;
+  plan_name: string | null;
+  access_expires_at: string | null;
+  created_at: string;
+};
+type Plan = { code: string; name: string };
 
 import { redirect } from "next/navigation";
 
@@ -38,29 +49,29 @@ export default async function ControlPage() {
 
   let leads: Lead[] = [];
   let orgs: Organization[] = [];
+  let plans: Plan[] = [];
   let leadsCount = 0;
   let orgsCount = 0;
 
   try {
-    const [recentLeads, recentOrgs, leadTotal, orgTotal] = await Promise.all([
+    const [recentLeads, recentOrgs, leadTotal, activePlans] = await Promise.all([
       supabase.from("leads").select("id, full_name, company_name, email, business_type, created_at").order("created_at", { ascending: false }).limit(8),
-      supabase.from("organizations").select("id, name, business_type, status, created_at").eq("is_internal", false).order("created_at", { ascending: false }).limit(6),
+      supabase.rpc("admin_list_organizations"),
       supabase.from("leads").select("id", { count: "exact", head: true }),
-      supabase.from("organizations").select("id", { count: "exact", head: true }).eq("is_internal", false),
+      supabase.from("plans").select("code, name").eq("is_active", true).order("monthly_price"),
     ]);
     leads = (recentLeads.data || []) as Lead[];
     orgs = (recentOrgs.data || []) as Organization[];
+    plans = (activePlans.data || []) as Plan[];
     leadsCount = leadTotal.count ?? 0;
-    orgsCount = orgTotal.count ?? 0;
+    orgsCount = orgs.length;
   } catch (e) {
     console.error("Error loading /control data (check Supabase env vars in Vercel):", e);
   }
 
-  const realCompanies = orgs.map((o) => ({
-    name: o.name,
-    type: o.business_type,
-    status: ({ trial: "Trial", active: "Activa", suspended: "Suspendida", cancelled: "Cancelada" } as Record<string, string>)[o.status] ?? o.status,
-  }));
+  const statusLabel = { trial: "Trial", active: "Activa", suspended: "Suspendida", cancelled: "Cancelada" } as Record<string, string>;
+  const accessLabel = { trial: "Trial activo", active: "Pagado", unpaid: "Impago", suspended: "Suspendido", cancelled: "Cancelado", expired: "Vencido" } as Record<string, string>;
+  const suggestedTrialEnd = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
   return (
     <DashboardShell mode="control" active="platform">
@@ -107,14 +118,31 @@ export default async function ControlPage() {
           <div className="panel-card__heading"><div><h2>Organizaciones recientes</h2><p>Datos reales de Supabase</p></div><button className="panel-link panel-link--plain">Ver todas <ArrowRight size={14} /></button></div>
           <div className="data-table-wrap">
             <table className="data-table admin-table">
-              <thead><tr><th>EMPRESA</th><th>TIPO</th><th>ESTADO</th><th /></tr></thead>
+              <thead><tr><th>EMPRESA</th><th>ESTADO REAL</th><th>PLAN</th><th>CONTROL</th></tr></thead>
               <tbody>
-                {realCompanies.length > 0 ? realCompanies.map((company, idx) => (
-                  <tr key={idx}>
-                    <td><strong>{company.name}</strong></td>
-                    <td><span className="plan-chip">{company.type}</span></td>
-                    <td><span className={company.status === "Activa" || company.status === "Demo" ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>{company.status}</span></td>
-                    <td><button className="table-action"><MoreHorizontal size={16} /></button></td>
+                {orgs.length > 0 ? orgs.slice(0, 20).map((company) => (
+                  <tr key={company.id}>
+                    <td><strong>{company.name}</strong><br /><small>{company.business_type}</small></td>
+                    <td>
+                      <span className={company.access_state === "active" || company.access_state === "trial" ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>{accessLabel[company.access_state] ?? company.access_state}</span>
+                      <br /><small>Org: {statusLabel[company.organization_status] ?? company.organization_status}</small>
+                    </td>
+                    <td><span className="plan-chip">{company.plan_name ?? "Sin plan"}</span><br /><small>{company.access_expires_at ? new Intl.DateTimeFormat("es-PE", { dateStyle: "short" }).format(new Date(company.access_expires_at)) : "Sin vencimiento"}</small></td>
+                    <td>
+                      <form action={manageOrganization} style={{ display: "flex", gap: 6, flexWrap: "wrap", minWidth: 380 }}>
+                        <input type="hidden" name="organization_id" value={company.id} />
+                        <select name="status" defaultValue={company.organization_status} aria-label={`Estado de ${company.name}`}>
+                          <option value="trial">Trial</option><option value="active">Activa</option><option value="suspended">Suspendida</option><option value="cancelled">Cancelada</option>
+                        </select>
+                        <button className="button button--secondary" name="operation" value="status">Estado</button>
+                        <select name="plan_code" defaultValue={company.plan_code ?? "basic"} aria-label={`Plan de ${company.name}`}>
+                          {plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}
+                        </select>
+                        <button className="button button--secondary" name="operation" value="plan">Plan 30d</button>
+                        <input type="date" name="trial_end" defaultValue={suggestedTrialEnd} aria-label={`Fin de trial de ${company.name}`} />
+                        <button className="button button--secondary" name="operation" value="trial">Extender</button>
+                      </form>
+                    </td>
                   </tr>
                 )) : (
                   <tr><td colSpan={4} style={{padding: '16px', color: '#778398'}}>Aún no hay organizaciones. Comparte /demo</td></tr>

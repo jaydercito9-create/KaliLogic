@@ -46,7 +46,20 @@ type DashboardShellProps = {
   active?: string;
   orgId?: string;
   entitlement?: { label: string; state: string; detail: string };
+  features?: string[];
   children: React.ReactNode;
+};
+
+const navFeature: Record<string, string> = {
+  sales: "sales",
+  products: "inventory",
+  inventory: "inventory",
+  categories: "inventory",
+  customers: "customers",
+  suppliers: "suppliers",
+  cash: "cash",
+  reports: "reports",
+  settings: "settings",
 };
 
 const clientSections: { label: string; items: NavItem[] }[] = [
@@ -100,10 +113,14 @@ const controlSections: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-export function DashboardShell({ mode, active = "dashboard", orgId, entitlement, children }: DashboardShellProps) {
+export function DashboardShell({ mode, active = "dashboard", orgId, entitlement, features = [], children }: DashboardShellProps) {
   const [open, setOpen] = useState(false);
   const isControl = mode === "control";
-  const sections = isControl ? controlSections : clientSections;
+  const sections = isControl
+    ? controlSections
+    : clientSections
+        .map((section) => ({ ...section, items: section.items.filter((item) => !navFeature[item.key] || features.includes(navFeature[item.key])) }))
+        .filter((section) => section.items.length);
 
   const [userName, setUserName] = useState(isControl ? "Admin" : "Usuario");
   const [orgName, setOrgName] = useState(isControl ? "Plataforma KaliLogic" : "Mi Negocio");
