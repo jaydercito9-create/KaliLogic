@@ -38,6 +38,7 @@ export function DemoForm() {
     const { error: otpError } = await createClient().auth.signInWithOtp({
       email: result.email as string,
       options: {
+        // Legacy token_hash flow (no PKCE)
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/app&provision=demo`,
         shouldCreateUser: true,
         data: { full_name: fullName.trim(), phone: phone.replace(/\D/g, "") },

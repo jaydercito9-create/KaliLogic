@@ -67,9 +67,13 @@ export async function createDemo(value: unknown) {
   } catch (error) {
     console.error("CREATE DEMO ERROR FULL:", error);
 
-    return {
-      success: false,
-      error: JSON.stringify(error, null, 2),
-    };
+    const message =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message?: unknown }).message || "")
+        : "";
+    if (message.includes("rate limit")) {
+      return { success: false as const, error: "Demasiados intentos. Inténtalo nuevamente en una hora." };
+    }
+    return { success: false as const, error: "No se pudo registrar la solicitud. Inténtalo de nuevo." };
   }
 }

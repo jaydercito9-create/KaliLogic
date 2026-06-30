@@ -65,6 +65,7 @@ export default function LoginPage() {
     const { error: otpError } = await createClient().auth.signInWithOtp({
       email,
       options: {
+        // Legacy token_hash flow (no PKCE)
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/app`,
         shouldCreateUser: false,
       },
