@@ -36,7 +36,7 @@ export function DemoForm() {
     }
 
     const { error: otpError } = await createClient().auth.signInWithOtp({
-      email: result.email,
+      email: result.email as string,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/app&provision=demo`,
         shouldCreateUser: true,
@@ -49,7 +49,7 @@ export function DemoForm() {
       setError("La solicitud se guardó, pero no pudimos enviar el enlace. Inténtalo nuevamente.");
       return;
     }
-    setSentEmail(result.email);
+    setSentEmail(result.email as string);
   }
 
   if (sentEmail) {
