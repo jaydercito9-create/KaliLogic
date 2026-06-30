@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const mpPayload = {
     reason: `KaliLogic ${selectedPlan.name}`,
     external_reference: `${membership.organization_id}:${plan}`,
-    payer_email: user.email,
+    // payer_email omitido: MP muestra su propio login en el checkout (evita conflicto real/test user)
     auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: Number(selectedPlan.monthly_price), currency_id: "PEN" },
     back_url: `${request.nextUrl.origin}/app?billing=return`,
     status: "pending",
