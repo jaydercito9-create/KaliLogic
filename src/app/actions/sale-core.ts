@@ -1,63 +1,26 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-export type CartItem = {
-  product_id: string;
-  name: string;
-  unit_price: number;
-  quantity: number;
-};
+export const PAYMENT_METHODS = ["efectivo", "tarjeta", "yape", "transferencia"] as const;
 
 export type SaleInput = {
-  org_id: string;
-  items: CartItem[];
+  items: Array<{ product_id: string; quantity: number }>;
   customer_name: string;
-  payment_method: string;
-  discount: number;
+  payment_method: (typeof PAYMENT_METHODS)[number];
 };
 
-export async function completeSale(
-  data: SaleInput,
-  userId: string,
-  service: Pick<SupabaseClient, "from" | "rpc">
-) {
-  const subtotal = data.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
-  const total = Math.max(0, subtotal - data.discount);
-  const { data: created, error } = await service
-    .from("sales")
-    .insert({
-      organization_id: data.org_id,
-      customer_name: data.customer_name || null,
-      subtotal: Number(subtotal.toFixed(2)),
-      discount: Number(data.discount.toFixed(2)),
-      total: Number(total.toFixed(2)),
-      payment_method: data.payment_method,
-      status: "completed",
-      created_by: userId,
-    })
-    .select()
-    .single();
+export function parseSaleInput(value: unknown): SaleInput | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  if (!Array.isArray(input.items) || input.items.length === 0 || input.items.length > 100) return null;
+  if (typeof input.payment_method !== "string" || !PAYMENT_METHODS.includes(input.payment_method as SaleInput["payment_method"])) return null;
+  if (typeof input.customer_name !== "string" || input.customer_name.length > 120) return null;
 
-  const sale = created as { id: string; sale_number: number } | null;
-  if (error || !sale) throw error ?? new Error("Sale was not created");
+  const items = input.items.map((item) => {
+    if (!item || typeof item !== "object") return null;
+    const row = item as Record<string, unknown>;
+    if (typeof row.product_id !== "string" || !row.product_id || typeof row.quantity !== "number" || !Number.isFinite(row.quantity) || row.quantity <= 0) return null;
+    return { product_id: row.product_id, quantity: row.quantity };
+  });
 
-  const { error: itemsError } = await service.from("sale_items").insert(data.items.map((item) => ({
-    organization_id: data.org_id,
-    sale_id: sale.id,
-    product_id: item.product_id,
-    quantity: item.quantity,
-    unit_price: Number(item.unit_price.toFixed(2)),
-    total: Number((item.unit_price * item.quantity).toFixed(2)),
-  })));
-  if (itemsError) throw itemsError;
-
-  for (const item of data.items) {
-    const { error: stockError } = await service.rpc("decrement_stock", {
-      p_org_id: data.org_id,
-      p_product_id: item.product_id,
-      p_qty: item.quantity,
-    });
-    if (stockError) throw stockError;
-  }
-
-  return { success: true as const, saleId: sale.id, saleNumber: sale.sale_number, total };
+  return items.every((item) => item !== null)
+    ? { items: items as SaleInput["items"], customer_name: input.customer_name.trim(), payment_method: input.payment_method as SaleInput["payment_method"] }
+    : null;
 }

@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
-  ArrowUpRight,
   Building2,
-  CircleDollarSign,
   Clock3,
   CreditCard,
   Headphones,
@@ -12,13 +10,15 @@ import {
   Plus,
   Sparkles,
   Store,
-  TrendingUp,
   UserRoundPlus,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Control de plataforma" };
+
+type Lead = { id: string; full_name: string; company_name: string; email: string; business_type: string; created_at: string };
+type Organization = { id: string; name: string; business_type: string; status: string; created_at: string };
 
 import { redirect } from "next/navigation";
 
@@ -36,36 +36,30 @@ export default async function ControlPage() {
 
   if (!profile?.is_platform_admin) redirect("/app");
 
-  let leads: any[] = [];
-  let orgs: any[] = [];
+  let leads: Lead[] = [];
+  let orgs: Organization[] = [];
+  let leadsCount = 0;
+  let orgsCount = 0;
 
   try {
-    // Carga datos reales - SOLO clientes, oculta orgs internas (tu tienda)
-    const { data: l } = await supabase
-      .from("leads")
-      .select("id, full_name, company_name, email, business_type, created_at")
-      .order("created_at", { ascending: false })
-      .limit(8);
-    leads = l || [];
-
-    const { data: o } = await supabase
-      .from("organizations")
-      .select("id, name, business_type, status, created_at")
-      .eq("is_internal", false)   // <<-- OCULTA tu tienda propia
-      .order("created_at", { ascending: false })
-      .limit(6);
-    orgs = o || [];
+    const [recentLeads, recentOrgs, leadTotal, orgTotal] = await Promise.all([
+      supabase.from("leads").select("id, full_name, company_name, email, business_type, created_at").order("created_at", { ascending: false }).limit(8),
+      supabase.from("organizations").select("id, name, business_type, status, created_at").eq("is_internal", false).order("created_at", { ascending: false }).limit(6),
+      supabase.from("leads").select("id", { count: "exact", head: true }),
+      supabase.from("organizations").select("id", { count: "exact", head: true }).eq("is_internal", false),
+    ]);
+    leads = (recentLeads.data || []) as Lead[];
+    orgs = (recentOrgs.data || []) as Organization[];
+    leadsCount = leadTotal.count ?? 0;
+    orgsCount = orgTotal.count ?? 0;
   } catch (e) {
     console.error("Error loading /control data (check Supabase env vars in Vercel):", e);
   }
 
-  const realCompanies = (orgs || []).map((o: any) => ({
+  const realCompanies = orgs.map((o) => ({
     name: o.name,
-    owner: "—",
-    plan: "Básico",
-    status: o.status === "trial" ? "Trial" : "Activa",
-    renewal: "—",
-    usage: "—",
+    type: o.business_type,
+    status: ({ trial: "Trial", active: "Activa", suspended: "Suspendida", cancelled: "Cancelada" } as Record<string, string>)[o.status] ?? o.status,
   }));
 
   return (
@@ -88,12 +82,12 @@ export default async function ControlPage() {
       <section className="kpi-grid admin-kpis">
         <article className="kpi-card">
           <div><span className="kpi-card__icon kpi-card__icon--blue"><Building2 size={20} /></span><small>Organizaciones</small></div>
-          <strong>{orgs.length}</strong>
+          <strong>{orgsCount}</strong>
           <p>Datos reales</p>
         </article>
         <article className="kpi-card">
           <div><span className="kpi-card__icon kpi-card__icon--violet"><UserRoundPlus size={20} /></span><small>Leads / Interesados</small></div>
-          <strong>{leads.length}</strong>
+          <strong>{leadsCount}</strong>
           <p>De /demo</p>
         </article>
         <article className="kpi-card">
@@ -115,10 +109,10 @@ export default async function ControlPage() {
             <table className="data-table admin-table">
               <thead><tr><th>EMPRESA</th><th>TIPO</th><th>ESTADO</th><th /></tr></thead>
               <tbody>
-                {realCompanies.length > 0 ? realCompanies.map((company: any, idx: number) => (
+                {realCompanies.length > 0 ? realCompanies.map((company, idx) => (
                   <tr key={idx}>
                     <td><strong>{company.name}</strong></td>
-                    <td><span className="plan-chip">{company.plan}</span></td>
+                    <td><span className="plan-chip">{company.type}</span></td>
                     <td><span className={company.status === "Activa" || company.status === "Demo" ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>{company.status}</span></td>
                     <td><button className="table-action"><MoreHorizontal size={16} /></button></td>
                   </tr>
@@ -133,7 +127,7 @@ export default async function ControlPage() {
         <article className="panel-card activity-card">
           <div className="panel-card__heading"><div><h2>Leads recientes</h2><p>De personas que llenaron /demo</p></div><Headphones size={17} /></div>
           <div className="admin-tasks">
-            {leads.length > 0 ? leads.slice(0, 5).map((lead: any) => (
+            {leads.length > 0 ? leads.slice(0, 5).map((lead) => (
               <div key={lead.id} className="text-sm" style={{marginBottom: '8px'}}>
                 <strong>{lead.company_name}</strong> — {lead.full_name}<br />
                 <small>{lead.email} • {lead.business_type}</small>

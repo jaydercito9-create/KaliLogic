@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowLeft,
-  ArrowUpRight,
   Boxes,
   CircleDollarSign,
   Package,
@@ -15,6 +14,8 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Mi tienda — Control" };
+
+type Product = { id: string; name: string; sku: string; sale_price: number | string; category: string | null };
 
 import { redirect } from "next/navigation";
 
@@ -35,7 +36,8 @@ export default async function MyBusinessPage() {
 
   let tiendaName = "Tu Tienda Interna";
   let orgId: string | null = null;
-  let productos: any[] = [];
+  let productos: Product[] = [];
+  let productCount = 0;
 
   const { data: membership } = await supabase
     .from("memberships")
@@ -45,7 +47,7 @@ export default async function MyBusinessPage() {
     .limit(1)
     .maybeSingle();
 
-  const org = membership?.organizations as any;
+  const org = membership?.organizations as { name?: string; is_internal?: boolean } | null;
   if (org?.is_internal) {
     tiendaName = org.name || "Tu Tienda Interna";
     orgId = membership?.organization_id || null;
@@ -61,12 +63,12 @@ export default async function MyBusinessPage() {
   }
 
   if (orgId) {
-    const { data: prods } = await supabase
-      .from("products")
-      .select("id, name, sku, sale_price, category")
-      .eq("organization_id", orgId)
-      .limit(10);
-    productos = prods || [];
+    const [recent, total] = await Promise.all([
+      supabase.from("products").select("id, name, sku, sale_price, category").eq("organization_id", orgId).limit(10),
+      supabase.from("products").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
+    ]);
+    productos = (recent.data || []) as Product[];
+    productCount = total.count ?? 0;
   }
 
   return (
@@ -82,7 +84,7 @@ export default async function MyBusinessPage() {
       </div>
 
       <section className="kpi-grid">
-        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--blue"><CircleDollarSign size={20} /></span><small>Productos</small></div><strong>{productos.length}</strong><p>Datos reales</p></article>
+        <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--blue"><CircleDollarSign size={20} /></span><small>Productos</small></div><strong>{productCount}</strong><p>Total real</p></article>
         <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--violet"><Boxes size={20} /></span><small>Catálogo</small></div><strong>Real</strong><p>Tu tienda</p></article>
         <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--cyan"><ShoppingCart size={20} /></span><small>Ventas</small></div><strong>—</strong><p>Próximamente</p></article>
         <article className="kpi-card"><div><span className="kpi-card__icon kpi-card__icon--orange"><WalletCards size={20} /></span><small>Caja</small></div><strong>—</strong><p>Próximamente</p></article>
@@ -102,7 +104,7 @@ export default async function MyBusinessPage() {
         <article className="panel-card">
           <div className="panel-card__heading"><div><h2>Productos de tu tienda</h2><p>Datos reales de {tiendaName}</p></div></div>
           <div className="stock-list">
-            {productos.length > 0 ? productos.map((p: any, i: number) => (
+            {productos.length > 0 ? productos.map((p, i) => (
               <div key={i}>
                 <span className="stock-product stock-product--blue"><Package size={18} /></span>
                 <p><strong>{p.name}</strong><small>{p.sku} · S/ {p.sale_price}</small></p>

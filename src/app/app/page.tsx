@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import type { ComponentType } from "react";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import Link from "next/link";
 import {
   Boxes,
@@ -21,7 +23,7 @@ import { redirect } from "next/navigation";
 export const metadata: Metadata = { title: "Dashboard | KaliLogic" };
 
 // ── Módulo: Próximamente ─────────────────────────────────────────────────────
-function ComingSoon({ modulo, icon: Icon, desc }: { modulo: string; icon: any; desc: string }) {
+function ComingSoon({ modulo, icon: Icon, desc }: { modulo: string; icon: ComponentType<{ size?: number }>; desc: string }) {
   return (
     <div className="coming-soon-panel">
       <span className="coming-soon-panel__icon"><Icon size={32} /></span>
@@ -33,13 +35,13 @@ function ComingSoon({ modulo, icon: Icon, desc }: { modulo: string; icon: any; d
 }
 
 // ── Módulo: Productos ────────────────────────────────────────────────────────
-async function ProductosModule({ orgId, supabase }: { orgId: string; supabase: any }) {
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, name, sku, sale_price, category")
-    .eq("organization_id", orgId)
-    .order("created_at", { ascending: false })
-    .limit(30);
+type ProductRow = { id: string; name: string; sku: string; sale_price: number | string; category: string | null };
+
+async function ProductosModule({ orgId, supabase }: { orgId: string; supabase: SupabaseClient }) {
+  const [{ data: products }, { count }] = await Promise.all([
+    supabase.from("products").select("id, name, sku, sale_price, category").eq("organization_id", orgId).order("created_at", { ascending: false }).limit(30),
+    supabase.from("products").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
+  ]);
 
   return (
     <div>
@@ -51,13 +53,13 @@ async function ProductosModule({ orgId, supabase }: { orgId: string; supabase: a
       </div>
       <article className="panel-card">
         <div className="panel-card__heading">
-          <div><h2>Catálogo completo</h2><p>{products?.length || 0} productos registrados</p></div>
+          <div><h2>Productos recientes</h2><p>{count ?? 0} productos registrados</p></div>
         </div>
         <div className="data-table-wrap">
           <table className="data-table">
             <thead><tr><th>NOMBRE</th><th>SKU</th><th>CATEGORÍA</th><th>PRECIO</th></tr></thead>
             <tbody>
-              {(products || []).length > 0 ? (products || []).map((p: any) => (
+              {(products || []).length > 0 ? (products as ProductRow[]).map((p) => (
                 <tr key={p.id}>
                   <td><strong>{p.name}</strong></td>
                   <td><span className="plan-chip">{p.sku}</span></td>
@@ -78,7 +80,13 @@ async function ProductosModule({ orgId, supabase }: { orgId: string; supabase: a
 }
 
 // ── Módulo: Inventario ───────────────────────────────────────────────────────
-async function InventarioModule({ orgId, supabase }: { orgId: string; supabase: any }) {
+type InventoryRow = {
+  quantity: number;
+  minimum_quantity: number;
+  products: { name: string; sku: string; category: string | null } | null;
+};
+
+async function InventarioModule({ orgId, supabase }: { orgId: string; supabase: SupabaseClient }) {
   const { data: balances } = await supabase
     .from("inventory_balances")
     .select("quantity, minimum_quantity, products(name, sku, category)")
@@ -99,8 +107,8 @@ async function InventarioModule({ orgId, supabase }: { orgId: string; supabase: 
           <table className="data-table">
             <thead><tr><th>PRODUCTO</th><th>SKU</th><th>STOCK</th><th>MÍNIMO</th><th>ESTADO</th></tr></thead>
             <tbody>
-              {(balances || []).length > 0 ? (balances || []).map((b: any, i: number) => {
-                const p = b.products as any;
+              {(balances || []).length > 0 ? (balances as unknown as InventoryRow[]).map((b, i) => {
+                const p = b.products;
                 const low = b.quantity <= (b.minimum_quantity || 5);
                 return (
                   <tr key={i}>
@@ -129,32 +137,32 @@ async function InventarioModule({ orgId, supabase }: { orgId: string; supabase: 
 }
 
 // ── Dashboard principal ──────────────────────────────────────────────────────
-async function DashboardHome({ user, orgName, orgId, supabase }: any) {
+type LowStockItem = { name: string; sku: string; units: number; tone: string };
+type LowStockRow = { product_name: string; sku: string; quantity: number };
+
+async function DashboardHome({ user, orgName, orgId, supabase }: { user: User; orgName: string; orgId: string; supabase: SupabaseClient }) {
   let productsCount = 0;
-  let lowStock: any[] = [];
+  let lowStock: LowStockItem[] = [];
+  let lowStockCount = 0;
 
   try {
-    const { data: products } = await supabase
+    const { count } = await supabase
       .from("products")
-      .select("id")
-      .eq("organization_id", orgId)
-      .limit(200);
-    productsCount = products?.length || 0;
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId);
+    productsCount = count ?? 0;
 
     if (orgId && productsCount > 0) {
-      const { data: balances } = await supabase
-        .from("inventory_balances")
-        .select("quantity, minimum_quantity, products(name, sku)")
-        .eq("organization_id", orgId)
-        .order("quantity", { ascending: true })
-        .limit(6);
+      const [{ data: balances }, { count }] = await Promise.all([
+        supabase.from("low_stock_alerts").select("quantity, product_name, sku").eq("organization_id", orgId).order("quantity", { ascending: true }).limit(3),
+        supabase.from("low_stock_alerts").select("sku", { count: "exact", head: true }).eq("organization_id", orgId),
+      ]);
+      lowStockCount = count ?? 0;
       const tones = ["blue", "violet", "orange"];
-      lowStock = (balances || [])
-        .filter((b: any) => b.products)
-        .slice(0, 3)
-        .map((b: any, i: number) => ({
-          name: (b.products as any).name,
-          sku: (b.products as any).sku,
+      lowStock = ((balances ?? []) as LowStockRow[])
+        .map((b, i) => ({
+          name: b.product_name,
+          sku: b.sku,
           units: b.quantity,
           tone: tones[i % 3],
         }));
@@ -196,7 +204,7 @@ async function DashboardHome({ user, orgName, orgId, supabase }: any) {
         </article>
         <article className="kpi-card">
           <div><span className="kpi-card__icon kpi-card__icon--violet"><Boxes size={20} /></span><small>Stock bajo</small></div>
-          <strong>{lowStock.length}</strong>
+          <strong>{lowStockCount}</strong>
           <p>Necesitan atención</p>
         </article>
         <article className="kpi-card">
@@ -215,10 +223,10 @@ async function DashboardHome({ user, orgName, orgId, supabase }: any) {
         <article className="panel-card stock-card">
           <div className="panel-card__heading">
             <div><h2>Stock por atender</h2><p>Los que tienen menos unidades</p></div>
-            <span className="alert-count">{lowStock.length}</span>
+            <span className="alert-count">{lowStockCount}</span>
           </div>
           <div className="stock-list">
-            {lowStock.length > 0 ? lowStock.map((item: any, idx: number) => (
+            {lowStock.length > 0 ? lowStock.map((item, idx) => (
               <div key={item.sku || idx}>
                 <span className={`stock-product stock-product--${item.tone}`}><Package size={18} /></span>
                 <p><strong>{item.name}</strong><small>{item.sku}</small></p>
@@ -262,6 +270,8 @@ export default async function ClientDashboardPage({
 
   let orgName = "Tu Negocio";
   let orgId = "";
+  let entitlement = { label: "Sin plan", state: "Pendiente", detail: "Completa la activación de tu empresa" };
+  let canWrite = false;
 
   try {
     const { data: membership } = await supabase
@@ -269,12 +279,26 @@ export default async function ClientDashboardPage({
       .select("organization_id, organizations(name, is_internal)")
       .eq("user_id", user.id)
       .eq("is_active", true)
+      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
 
-    const org = membership?.organizations as any;
+    const org = membership?.organizations as { name?: string; is_internal?: boolean } | null;
     if (org) orgName = org.name || "Tu Negocio";
     orgId = membership?.organization_id || "";
+
+    if (orgId) {
+      const { data: access } = await supabase.rpc("get_organization_entitlement", { p_organization_id: orgId }).single();
+      const status = access as { state: string; plan_name: string | null; expires_at: string | null } | null;
+      if (status) {
+        canWrite = status.state === "trial" || status.state === "paid";
+        entitlement = {
+          label: status.plan_name ? `${status.state === "trial" ? "Trial" : "Plan"} ${status.plan_name}` : "Sin plan",
+          state: status.state === "trial" ? "Activo" : status.state === "paid" ? "Pagado" : status.state === "suspended" ? "Suspendido" : "Vencido",
+          detail: status.expires_at ? `Válido hasta ${new Intl.DateTimeFormat("es-PE", { dateStyle: "medium" }).format(new Date(status.expires_at))}` : "Acciones críticas bloqueadas",
+        };
+      }
+    }
   } catch {}
 
   const activeKey = modulo === "dashboard" ? "dashboard"
@@ -290,7 +314,7 @@ export default async function ClientDashboardPage({
     : "dashboard";
 
   return (
-    <DashboardShell mode="client" active={activeKey} orgId={orgId}>
+    <DashboardShell mode="client" active={activeKey} orgId={orgId} entitlement={entitlement}>
       {modulo === "dashboard" && (
         <DashboardHome user={user} orgName={orgName} orgId={orgId} supabase={supabase} />
       )}
@@ -300,8 +324,11 @@ export default async function ClientDashboardPage({
       {modulo === "inventario" && orgId && (
         <InventarioModule orgId={orgId} supabase={supabase} />
       )}
-      {modulo === "ventas" && orgId && (
+      {modulo === "ventas" && orgId && canWrite && (
         <VentasModule orgId={orgId} />
+      )}
+      {modulo === "ventas" && orgId && !canWrite && (
+        <ComingSoon modulo="Acceso restringido" icon={Clock3} desc="Tu trial o suscripción no está activo. Reactiva el acceso antes de registrar ventas." />
       )}
       {modulo === "clientes" && (
         <ComingSoon modulo="Clientes" icon={UserPlus} desc="Gestiona tu base de clientes, historial de compras y datos de contacto." />

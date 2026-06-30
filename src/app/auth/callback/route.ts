@@ -4,7 +4,9 @@ import { createServerClient } from "@supabase/ssr";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/app";
+  const requestedNext = searchParams.get("next") ?? "/app";
+  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/app";
+  const provisionDemo = searchParams.get("provision") === "demo";
 
   if (code) {
     const supabaseResponse = NextResponse.redirect(`${origin}${next}`);
@@ -28,6 +30,15 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      if (provisionDemo) {
+        const { error: provisionError } = await supabase.rpc("provision_demo_organization");
+        if (provisionError) {
+          console.error("Demo provisioning error:", provisionError);
+          supabaseResponse.headers.set("location", `${origin}/login?error=demo_provision_failed`);
+          return supabaseResponse;
+        }
+      }
+
       // Redirect to /control if platform admin
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -38,7 +49,8 @@ export async function GET(request: NextRequest) {
             .eq("id", user.id)
             .single();
           if (profile?.is_platform_admin) {
-            return NextResponse.redirect(`${origin}/control`);
+            supabaseResponse.headers.set("location", `${origin}/control`);
+            return supabaseResponse;
           }
         }
       } catch {}

@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { processSale } from "@/app/actions/create-sale";
-import type { CartItem } from "@/app/actions/sale-core";
 
 type Product = {
   id: string;
@@ -23,13 +22,14 @@ type Product = {
   sale_price: number;
 };
 
+type CartItem = Product & { quantity: number };
+
 export function VentasModule({ orgId }: { orgId: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
-  const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [success, setSuccess] = useState<{ saleNumber: number; total: number } | null>(null);
@@ -58,40 +58,42 @@ export function VentasModule({ orgId }: { orgId: string }) {
 
   const addToCart = (p: Product) => {
     setCart((prev) => {
-      const existing = prev.find((i) => i.product_id === p.id);
+      const existing = prev.find((i) => i.id === p.id);
       if (existing) {
         return prev.map((i) =>
-          i.product_id === p.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
-      return [...prev, { product_id: p.id, name: p.name, unit_price: p.sale_price, quantity: 1 }];
+      return [...prev, { ...p, quantity: 1 }];
     });
   };
 
   const changeQty = (id: string, delta: number) => {
     setCart((prev) =>
       prev
-        .map((i) => (i.product_id === id ? { ...i, quantity: i.quantity + delta } : i))
+        .map((i) => (i.id === id ? { ...i, quantity: i.quantity + delta } : i))
         .filter((i) => i.quantity > 0)
     );
   };
 
-  const removeItem = (id: string) => setCart((prev) => prev.filter((i) => i.product_id !== id));
+  const removeItem = (id: string) => setCart((prev) => prev.filter((i) => i.id !== id));
 
-  const subtotal = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0);
-  const total = Math.max(0, subtotal - discount);
+  const subtotal = cart.reduce((s, i) => s + i.sale_price * i.quantity, 0);
 
   const handleSale = async () => {
     if (cart.length === 0) return;
     setProcessing(true);
     setError(null);
-    const res = await processSale({ org_id: orgId, items: cart, customer_name: customerName, payment_method: paymentMethod, discount });
+    const res = await processSale({
+      items: cart.map(({ id, quantity }) => ({ product_id: id, quantity })),
+      customer_name: customerName,
+      payment_method: paymentMethod,
+    });
     setProcessing(false);
     if (res.success) {
       setSuccess({ saleNumber: res.saleNumber, total: res.total });
       setCart([]);
       setCustomerName("");
-      setDiscount(0);
     } else {
       setError(res.error || "Error procesando la venta.");
     }
@@ -163,18 +165,18 @@ export function VentasModule({ orgId }: { orgId: string }) {
             {cart.length === 0 ? (
               <p className="pos-cart__empty">Toca un producto para agregarlo</p>
             ) : cart.map((item) => (
-              <div key={item.product_id} className="pos-cart__item">
+              <div key={item.id} className="pos-cart__item">
                 <div>
                   <strong>{item.name}</strong>
-                  <small>S/ {item.unit_price.toFixed(2)} c/u</small>
+                  <small>S/ {item.sale_price.toFixed(2)} c/u</small>
                 </div>
                 <div className="pos-qty">
-                  <button onClick={() => changeQty(item.product_id, -1)}><Minus size={12} /></button>
+                  <button onClick={() => changeQty(item.id, -1)}><Minus size={12} /></button>
                   <span>{item.quantity}</span>
-                  <button onClick={() => changeQty(item.product_id, 1)}><Plus size={12} /></button>
+                  <button onClick={() => changeQty(item.id, 1)}><Plus size={12} /></button>
                 </div>
-                <b>S/ {(item.unit_price * item.quantity).toFixed(2)}</b>
-                <button className="pos-remove" onClick={() => removeItem(item.product_id)}><X size={13} /></button>
+                <b>S/ {(item.sale_price * item.quantity).toFixed(2)}</b>
+                <button className="pos-remove" onClick={() => removeItem(item.id)}><X size={13} /></button>
               </div>
             ))}
           </div>
@@ -193,15 +195,9 @@ export function VentasModule({ orgId }: { orgId: string }) {
                 <option value="transferencia">Transferencia</option>
               </select>
             </label>
-            <label>
-              <span>Descuento (S/)</span>
-              <input type="number" min={0} step={0.5} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} />
-            </label>
-
             <div className="pos-totals">
               <span>Subtotal</span><span>S/ {subtotal.toFixed(2)}</span>
-              {discount > 0 && <><span>Descuento</span><span>- S/ {discount.toFixed(2)}</span></>}
-              <strong>TOTAL</strong><strong>S/ {total.toFixed(2)}</strong>
+              <strong>TOTAL</strong><strong>S/ {subtotal.toFixed(2)}</strong>
             </div>
 
             {error && <p style={{ color: "#ef4444", fontSize: 13 }}>{error}</p>}
@@ -211,7 +207,7 @@ export function VentasModule({ orgId }: { orgId: string }) {
               onClick={handleSale}
               disabled={cart.length === 0 || processing}
             >
-              {processing ? <><Loader2 size={16} className="spin" /> Procesando...</> : <>Registrar venta · S/ {total.toFixed(2)}</>}
+              {processing ? <><Loader2 size={16} className="spin" /> Procesando...</> : <>Registrar venta · S/ {subtotal.toFixed(2)}</>}
             </button>
           </div>
         </div>

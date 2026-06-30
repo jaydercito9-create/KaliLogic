@@ -31,20 +31,18 @@ Ya tienes `.env.local`. Las claves importantes:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (anon / publishable)
-- `SUPABASE_SERVICE_ROLE_KEY` (solo servidor)
-
-Nunca subas el service role al cliente.
 
 ## Estado actual (junio 2026)
 
 - ✅ Schema multiempresa + RLS en Supabase ejecutado
-- ✅ Formulario de demo guarda leads reales
+- ✅ Demo con magic link, correo verificado y rate limit en Supabase
 - ✅ Login con Supabase Auth funcional
 - ✅ Middleware con sesión de Supabase
 - ✅ Diseño profesional + responsive
 - ✅ Rutas /app y /control listas
-- ⏳ Creación automática de organización + datos de ejemplo (próximo)
-- ⏳ Timer real de 24h en servidor
+- ✅ Creación transaccional de organización + datos de ejemplo
+- ✅ Trial y límites básicos aplicados en base de datos
+- ✅ Ventas atómicas con precio y stock validados en base de datos
 - ⏳ Datos dinámicos en los paneles
 
 ## Próximos pasos recomendados

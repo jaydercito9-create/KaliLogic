@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Eye, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -12,12 +12,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setMessage(null);
 
     const supabase = createClient();
 
@@ -50,6 +52,26 @@ export default function LoginPage() {
     } catch {}
 
     router.push("/app");
+  }
+
+  async function sendMagicLink() {
+    if (!email) {
+      setError("Ingresa tu correo primero.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    const { error: otpError } = await createClient().auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/app`,
+        shouldCreateUser: false,
+      },
+    });
+    setLoading(false);
+    if (otpError) setError("No pudimos enviar el enlace seguro.");
+    else setMessage("Revisa tu correo para ingresar sin contraseña.");
   }
 
   return (
@@ -90,12 +112,8 @@ export default function LoginPage() {
             </div>
           </label>
 
-          <div className="login-options">
-            <label><input type="checkbox" /> Recordarme</label>
-            <a href="#">¿Olvidaste tu contraseña?</a>
-          </div>
-
           {error && <p className="text-sm text-red-600">{error}</p>}
+          {message && <p className="text-sm text-green-700">{message}</p>}
 
           <button
             type="submit"
@@ -103,6 +121,9 @@ export default function LoginPage() {
             disabled={loading}
           >
             {loading ? "Ingresando..." : <>Iniciar sesión <ArrowRight size={16} /></>}
+          </button>
+          <button type="button" className="button button--secondary w-full justify-center" disabled={loading} onClick={sendMagicLink}>
+            Enviarme un enlace seguro
           </button>
         </form>
 

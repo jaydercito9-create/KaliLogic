@@ -45,6 +45,7 @@ type DashboardShellProps = {
   mode: ShellMode;
   active?: string;
   orgId?: string;
+  entitlement?: { label: string; state: string; detail: string };
   children: React.ReactNode;
 };
 
@@ -99,7 +100,7 @@ const controlSections: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-export function DashboardShell({ mode, active = "dashboard", orgId, children }: DashboardShellProps) {
+export function DashboardShell({ mode, active = "dashboard", orgId, entitlement, children }: DashboardShellProps) {
   const [open, setOpen] = useState(false);
   const isControl = mode === "control";
   const sections = isControl ? controlSections : clientSections;
@@ -179,9 +180,9 @@ export function DashboardShell({ mode, active = "dashboard", orgId, children }: 
 
         {!isControl && (
           <div className="plan-usage-card">
-            <div><span>Trial 24h</span><b>Activo</b></div>
+            <div><span>{entitlement?.label ?? "Sin plan"}</span><b>{entitlement?.state ?? "Pendiente"}</b></div>
             <i><em /></i>
-            <small>Productos reales cargados</small>
+            <small>{entitlement?.detail ?? "Completa la activación de tu empresa"}</small>
           </div>
         )}
 
