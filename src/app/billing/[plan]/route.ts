@@ -28,12 +28,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }),
     cache: "no-store",
   });
-  const checkout = await response.json() as { id?: string; init_point?: string };
-  if (!response.ok || !checkout.id || !checkout.init_point) return NextResponse.redirect(new URL("/?billing=error#planes", request.url));
+  const checkout = await response.json() as { id?: string; init_point?: string; message?: string; error?: string; status?: number; cause?: any[] };
+  if (!response.ok || !checkout.id || !checkout.init_point) {
+    console.error("MERCADOPAGO ERROR:", response.status, checkout);
+    return NextResponse.redirect(new URL("/?billing=error#planes", request.url));
+  }
 
   const { error } = await supabase.rpc("start_subscription_checkout", {
     p_organization_id: membership.organization_id, p_plan_code: plan, p_provider_subscription_id: checkout.id,
   });
-  if (error) return NextResponse.redirect(new URL("/?billing=error#planes", request.url));
+  if (error) {
+    console.error("SUPABASE RPC ERROR:", error);
+    return NextResponse.redirect(new URL("/?billing=error#planes", request.url));
+  }
   return NextResponse.redirect(checkout.init_point);
 }
