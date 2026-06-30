@@ -80,7 +80,7 @@ const plans = [
   },
 ];
 
-export default async function MarketingPage({ searchParams }: { searchParams: Promise<{ billing?: string }> }) {
+export default async function MarketingPage({ searchParams }: { searchParams: Promise<{ billing?: string; mp?: string }> }) {
   const params = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -270,7 +270,7 @@ export default async function MarketingPage({ searchParams }: { searchParams: Pr
 
       <section className="pricing-section" id="planes">
         <div className="container">
-          {params.billing && <p className="status-pill status-pill--warning" style={{ marginBottom: 20 }}>{params.billing === "not_configured" ? "Configura las credenciales de Mercado Pago para contratar." : "No pudimos abrir el pago. Inténtalo nuevamente o contáctanos."}</p>}
+          {params.billing && <p className="status-pill status-pill--warning" style={{ marginBottom: 20 }}>{params.billing === "not_configured" ? "Configura las credenciales de Mercado Pago para contratar." : `No pudimos abrir el pago. ${params.mp ? `Error MP: ${params.mp}` : "Inténtalo nuevamente o contáctanos."}`}</p>}
           <div className="section-heading">
             <span className="eyebrow">PLANES TRANSPARENTES</span>
             <h2>Empieza simple. Crece cuando lo necesites.</h2>
