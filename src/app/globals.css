@@ -2523,3 +2523,87 @@ a {
 @media (max-width: 900px) {
   .notif-dropdown { right: 18px; }
 }
+
+/* ── Upgrade Banner (dashboard, trial vencido) ───────────────────────────────── */
+.upgrade-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(91,105,255,.1) 0%, rgba(168,85,247,.07) 100%);
+  border: 1.5px solid rgba(91,105,255,.3);
+  border-radius: 16px;
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.upgrade-banner__icon { font-size: 30px; flex-shrink: 0; }
+.upgrade-banner__text { flex: 1; min-width: 200px; }
+.upgrade-banner__text strong { display: block; font-size: .95rem; font-weight: 700; color: #1a2640; margin-bottom: 2px; }
+.upgrade-banner__text p { margin: 0; font-size: .825rem; color: #778398; }
+.upgrade-banner__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Upgrade Prompt (módulos bloqueados) ─────────────────────────────────────── */
+.upgrade-prompt { display: grid; gap: 28px; }
+.upgrade-prompt__header { text-align: center; padding: 32px 16px 8px; }
+.upgrade-prompt__icon { font-size: 44px; display: block; margin-bottom: 12px; }
+.upgrade-prompt__header h2 { font-size: 1.6rem; font-weight: 800; color: #1a2640; margin: 0 0 10px; }
+.upgrade-prompt__header p { color: #778398; font-size: .95rem; margin: 0; }
+.upgrade-prompt__plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.upgrade-plan {
+  background: #fff;
+  border: 1.5px solid #e8edf5;
+  border-radius: 16px;
+  padding: 28px 22px;
+  display: grid;
+  gap: 14px;
+  position: relative;
+}
+.upgrade-plan--featured {
+  border-color: #5b69ff;
+  background: linear-gradient(160deg, rgba(91,105,255,.06) 0%, #fff 60%);
+}
+.upgrade-plan__badge {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #5b69ff;
+  color: #fff;
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  padding: 3px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.upgrade-plan h3 { font-size: 1.05rem; font-weight: 700; color: #1a2640; margin: 0; }
+.upgrade-plan > p { color: #778398; font-size: .825rem; margin: 0; }
+.upgrade-plan__price { display: flex; align-items: flex-end; gap: 3px; }
+.upgrade-plan__price small { font-size: .9rem; color: #778398; padding-bottom: 3px; }
+.upgrade-plan__price strong { font-size: 1.9rem; font-weight: 800; color: #1a2640; line-height: 1; }
+.upgrade-plan__price span { font-size: .8rem; color: #778398; padding-bottom: 3px; }
+.upgrade-plan ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.upgrade-plan ul li { display: flex; align-items: center; gap: 7px; font-size: .825rem; color: #4a5568; }
+.upgrade-plan ul li svg { color: #22c55e; flex-shrink: 0; }
+.upgrade-prompt__enterprise {
+  text-align: center;
+  padding: 16px;
+  border-top: 1px solid #e8edf5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.upgrade-prompt__enterprise p { color: #778398; margin: 0; font-size: .9rem; }
+
+@media (max-width: 700px) {
+  .upgrade-banner { flex-direction: column; align-items: flex-start; }
+  .upgrade-banner__actions { width: 100%; }
+  .upgrade-banner__actions .button { flex: 1; text-align: center; }
+}
+

@@ -4,6 +4,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import Link from "next/link";
 import {
   Boxes,
+  Check,
   ChevronRight,
   CircleDollarSign,
   Clock3,
@@ -30,6 +31,64 @@ function ComingSoon({ modulo, icon: Icon, desc }: { modulo: string; icon: Compon
       <h2>{modulo}</h2>
       <p>{desc}</p>
       <Link href="/app" className="button button--secondary">← Volver al dashboard</Link>
+    </div>
+  );
+}
+
+// ── Upgrade Banner (aparece en dashboard cuando el trial vence) ──────────────
+function UpgradeBanner() {
+  return (
+    <div className="upgrade-banner">
+      <span className="upgrade-banner__icon">⏰</span>
+      <div className="upgrade-banner__text">
+        <strong>Tu prueba gratuita ha terminado</strong>
+        <p>Elige un plan para seguir usando KaliLogic. Tu información está guardada y segura.</p>
+      </div>
+      <div className="upgrade-banner__actions">
+        <Link href="/billing/basic" className="button button--secondary">Básico S/ 49</Link>
+        <Link href="/billing/premium" className="button button--primary">Premium S/ 99</Link>
+        <Link href="/billing/plus" className="button button--secondary">Plus S/ 179</Link>
+      </div>
+    </div>
+  );
+}
+
+// ── Upgrade Prompt (aparece al intentar entrar a módulos sin acceso) ─────────
+function UpgradePrompt() {
+  const plans = [
+    { code: "basic", name: "Básico", price: "49", description: "Para empezar a ordenar tu negocio.", features: ["1 sucursal", "2 usuarios", "Hasta 2,500 SKU", "Inventario y ventas"] },
+    { code: "premium", name: "Premium", price: "99", description: "Para negocios que ya están creciendo.", featured: true, features: ["2 sucursales", "5 usuarios", "Hasta 15,000 SKU", "Compras y proveedores"] },
+    { code: "plus", name: "Plus", price: "179", description: "Más control para equipos consolidados.", features: ["5 sucursales", "15 usuarios", "Hasta 50,000 SKU", "Roles avanzados"] },
+  ];
+  return (
+    <div className="upgrade-prompt">
+      <div className="upgrade-prompt__header">
+        <span className="upgrade-prompt__icon">⏰</span>
+        <h2>Tu prueba gratuita ha terminado</h2>
+        <p>Elige un plan para seguir usando KaliLogic. Tu información está guardada y segura.</p>
+      </div>
+      <div className="upgrade-prompt__plans">
+        {plans.map((plan) => (
+          <article key={plan.code} className={plan.featured ? "upgrade-plan upgrade-plan--featured" : "upgrade-plan"}>
+            {plan.featured && <span className="upgrade-plan__badge">MÁS ELEGIDO</span>}
+            <h3>{plan.name}</h3>
+            <p>{plan.description}</p>
+            <div className="upgrade-plan__price">
+              <small>S/</small><strong>{plan.price}</strong><span>/mes</span>
+            </div>
+            <Link href={`/billing/${plan.code}`} className={plan.featured ? "button button--primary" : "button button--secondary"}>
+              Contratar {plan.name}
+            </Link>
+            <ul>{plan.features.map((f) => <li key={f}><Check size={14} /> {f}</li>)}</ul>
+          </article>
+        ))}
+      </div>
+      <div className="upgrade-prompt__enterprise">
+        <p>¿Necesitas algo a tu medida?</p>
+        <a href="https://wa.me/51948097148?text=Hola%2C+vengo+desde+KaliLogic+y+quiero+información+sobre+planes." target="_blank" rel="noreferrer" className="button button--ghost">
+          Conversar con KaliLogic
+        </a>
+      </div>
     </div>
   );
 }
@@ -140,7 +199,7 @@ async function InventarioModule({ orgId, supabase }: { orgId: string; supabase: 
 type LowStockItem = { name: string; sku: string; units: number; tone: string };
 type LowStockRow = { product_name: string; sku: string; quantity: number };
 
-async function DashboardHome({ user, orgName, orgId, supabase }: { user: User; orgName: string; orgId: string; supabase: SupabaseClient }) {
+async function DashboardHome({ user, orgName, orgId, supabase, canWrite }: { user: User; orgName: string; orgId: string; supabase: SupabaseClient; canWrite: boolean }) {
   let productsCount = 0;
   let lowStock: LowStockItem[] = [];
   let lowStockCount = 0;
@@ -181,6 +240,7 @@ async function DashboardHome({ user, orgName, orgId, supabase }: { user: User; o
 
   return (
     <>
+      {!canWrite && <UpgradeBanner />}
       <div className="page-heading">
         <div>
           <span>Hoy</span>
@@ -342,7 +402,7 @@ export default async function ClientDashboardPage({
       {params.billing && <p className="status-pill status-pill--warning" style={{ marginBottom: 16 }}>Estamos confirmando tu pago con Mercado Pago.</p>}
       {params.error && <p className="status-pill status-pill--warning" style={{ marginBottom: 16 }}>{params.error}</p>}
       {modulo === "dashboard" && (
-        <DashboardHome user={user} orgName={orgName} orgId={orgId} supabase={supabase} />
+        <DashboardHome user={user} orgName={orgName} orgId={orgId} supabase={supabase} canWrite={canWrite} />
       )}
       {modulo === "productos" && orgId && canAccessModule && (
         <OperationalProducts orgId={orgId} supabase={supabase} />
@@ -354,7 +414,7 @@ export default async function ClientDashboardPage({
         <VentasModule orgId={orgId} />
       )}
       {modulo !== "dashboard" && !canAccessModule && (
-        <ComingSoon modulo="Acceso restringido" icon={Clock3} desc="Tu trial o suscripción no está activo. Reactiva el acceso antes de registrar ventas." />
+        <UpgradePrompt />
       )}
       {modulo === "clientes" && orgId && canAccessModule && <CustomersModule orgId={orgId} supabase={supabase} />}
       {modulo === "caja" && orgId && canAccessModule && <CashModule orgId={orgId} supabase={supabase} />}
